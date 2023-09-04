@@ -1,0 +1,6 @@
+ implementation abstract;
+ define behavior for ZUST01_A_SALESORDERRELATEDOBJE
+  {
+  create;
+ delete;
+ }

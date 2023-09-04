@@ -1,0 +1,6 @@
+@EndUserText.label: 'Service definition forZUST01_C_SCRHEADTP_000'
+define service ZUST01_UI_SCRHEADTP_000 {
+  expose ZUST01_C_SCRHEADTP_000 as FLEXIOM;
+  expose ZUST01_CE_SCRROW as FLEXIOMROW;
+  expose ZUST01_CE_SCRROW_01 as KEYFIGURES;
+}

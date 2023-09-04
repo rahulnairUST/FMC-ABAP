@@ -1,0 +1,8 @@
+ implementation abstract;
+ define behavior for ZUST01_A_SALESORDER
+  etag master ETAG__ETAG
+ {
+  create;
+ update;
+ delete;
+ }

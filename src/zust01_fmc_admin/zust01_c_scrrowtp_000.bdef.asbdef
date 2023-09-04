@@ -1,0 +1,18 @@
+projection;
+strict ( 1 );
+use draft;
+
+define behavior for ZUST01_C_SCRROWTP_000 alias FLEXIOMROW
+use etag
+
+{
+  use create;
+  use update;
+  use delete;
+
+  use action Edit;
+  use action Activate;
+  use action Discard;
+  use action Resume;
+  use action Prepare;
+}

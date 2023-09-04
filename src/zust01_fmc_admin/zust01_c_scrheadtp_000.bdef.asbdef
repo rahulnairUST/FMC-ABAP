@@ -1,0 +1,18 @@
+projection;
+strict ( 1 );
+use draft;
+
+define behavior for ZUST01_C_SCRHEADTP_000 alias FLEXIOM
+use etag
+
+{
+  use create;
+  use update;
+  use delete;
+
+  use action Edit;
+  use action Activate;
+  use action Discard;
+  use action Resume;
+  use action Prepare;
+}

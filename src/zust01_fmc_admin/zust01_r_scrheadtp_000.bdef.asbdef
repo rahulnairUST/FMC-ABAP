@@ -1,0 +1,68 @@
+managed implementation in class ZUST01_BP_SCRHEADTP_000 unique;
+strict ( 1 );
+with draft;
+
+define behavior for ZUST01_R_SCRHEADTP_000 alias FLEXIOM
+persistent table zust01_scrheadv
+draft table ZUST01_DSHEAD000
+etag master LocalLastChagnedAt
+lock master total etag LastChangedAt
+authorization master( global )
+
+{
+  field ( mandatory : create )
+   PlanningScreen;
+
+  field ( readonly )
+   CreatedAt,
+   CreatedBy,
+   LastChangedAt,
+   LocalLastChagnedAt,
+   LocalLastChangedBy;
+
+  field ( readonly : update )
+   PlanningScreen;
+
+
+  create;
+  update;
+  delete;
+
+  draft action Edit;
+  draft action Activate;
+  draft action Discard;
+  draft action Resume;
+  draft determine action Prepare;
+
+  mapping for ZUST01_SCRHEADV
+  {
+    PlanningScreen = planning_screen;
+    PlanningScreenDescr = planning_screen_descr;
+    ProductAllocationObject = product_allocation_object;
+    BuckDispFormat = buck_disp_format;
+    ExcelImport = excel_import;
+    ButtonCvcCollapse = button_cvc_collapse;
+    ButtonCvcPaging = button_cvc_paging;
+    CvcStatusLogWrite = cvc_status_log_write;
+    TimeseriesLogWrite = timeseries_log_write;
+    CvcLogDisplay = cvc_log_display;
+    TraceDisplay = trace_display;
+    CvcStatusChangeDispOption = cvc_status_change_disp_option;
+    CvcStatusChange = cvc_status_change;
+    ButtonRefresh = button_refresh;
+    DraftDisplay = draft_display;
+    DraftMultiUser = draft_multi_user;
+    AllowNotes = allow_notes;
+    ConsumptionView = consumption_view;
+    CvcAddRemove = cvc_add_remove;
+    SalesOrderView = sales_order_view;
+    UserSettings = user_settings;
+    PeriodIndicator = period_indicator;
+    FiscalYearVariant = fiscal_year_variant;
+    CreatedBy = created_by;
+    CreatedAt = created_at;
+    LocalLastChangedBy = local_last_changed_by;
+    LocalLastChagnedAt = local_last_chagned_at;
+    LastChangedAt = last_changed_at;
+  }
+}

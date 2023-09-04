@@ -1,0 +1,4 @@
+@EndUserText.label: 'Service definition forZUST01_C_SCRROWTP_000'
+define service ZUST01_UI_SCRROW_000 {
+  expose ZUST01_C_SCRROWTP_000 as FLEXIOMROW;
+}

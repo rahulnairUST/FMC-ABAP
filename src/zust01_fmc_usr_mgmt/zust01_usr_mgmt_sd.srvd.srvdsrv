@@ -1,0 +1,5 @@
+@EndUserText.label: 'User Management Service Defination'
+define service ZUST01_USR_MGMT_SD {
+  expose ZUST01_USR_MGMT_DD as UserMngmnt;
+  expose ZUST01_CE_USR_MGMT_01 as UserValidation;
+}
