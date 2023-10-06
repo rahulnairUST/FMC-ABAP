@@ -1,0 +1,11 @@
+/********** GENERATED on 10/04/2023 at 14:44:45 by CB9980000020**************/
+ @OData.entitySet.name: 'VL_FV_BWKRS_CUS' 
+ @OData.entityType.name: 'VL_FV_BWKRS_CUS' 
+ define root abstract entity ZUST01_VL_FV_BWKRS_CUS { 
+ key Code : abap.char( 1 ) ; 
+ @Odata.property.valueControl: 'Text1_vc' 
+ @OData.property.name: 'Text' 
+ Text1 : abap.char( 60 ) ; 
+ Text1_vc : RAP_CP_ODATA_VALUE_CONTROL ; 
+ 
+ } 

@@ -1,0 +1,7 @@
+ implementation abstract;
+ define behavior for ZUST01_VL_FV_BWKRS_CUS
+  {
+  create;
+ update;
+ delete;
+ }

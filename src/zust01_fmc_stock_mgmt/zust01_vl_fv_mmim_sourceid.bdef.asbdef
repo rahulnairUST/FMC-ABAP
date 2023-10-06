@@ -1,0 +1,7 @@
+ implementation abstract;
+ define behavior for ZUST01_VL_FV_MMIM_SOURCEID
+  {
+  create;
+ update;
+ delete;
+ }
