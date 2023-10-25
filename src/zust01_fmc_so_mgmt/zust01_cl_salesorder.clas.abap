@@ -18,6 +18,30 @@ CLASS zust01_cl_salesorder DEFINITION
     TYPES t_schedln_itm TYPE TABLE OF zust01_a_salesorderschedulelin WITH DEFAULT KEY.
     TYPES : t_rt_rangeopt TYPE if_rap_query_filter=>tt_range_option.
 
+        TYPES: BEGIN OF ty_tab512,
+            wa TYPE zdel_512,
+           END OF ty_tab512.
+        DATA: lt_data TYPE STANDARD TABLE OF ty_tab512.
+
+        TYPES: BEGIN OF ty_soext,
+               vbeln TYPE c LENGTH 10,
+               posnr TYPE n LENGTH 6,
+               etenr TYPE n LENGTH 4,
+               ezeit TYPE t,
+*               mbdat TYPE d,
+               mbdat TYPE c LENGTH 28,
+               mbuhr TYPE t,
+               wadat TYPE c LENGTH 28,
+*               wadat TYPE d,
+               wauhr TYPE t,
+               lifsp TYPE c LENGTH 2,
+               route TYPE c LENGTH 6,
+               antlf TYPE p DECIMALS 1 LENGTH 1,
+               vsbed TYPE c LENGTH 2,
+               cmgst TYPE c LENGTH 1,
+               lifsk TYPE c LENGTH 2,
+        END OF ty_soext.
+        DATA:lt_soext TYPE STANDARD TABLE OF ty_soext WITH non-UNIQUE KEY vbeln.
 
 
 
@@ -93,6 +117,23 @@ CLASS zust01_cl_salesorder DEFINITION
                 /iwbep/cx_gateway
                 cx_web_http_client_error
                 cx_http_dest_provider_error.
+
+
+* Get Sales Order Fields EXT
+    METHODS get_sales_order_ext
+      IMPORTING
+*                it_filter_cond   TYPE if_rap_query_filter=>tt_name_range_pairs   OPTIONAL
+*                top              TYPE i OPTIONAL
+*                skip             TYPE i OPTIONAL
+                it_salesorder    TYPE t_rt_rangeopt
+                it_salesorderitm TYPE t_rt_rangeopt
+        RETURNING VALUE(rt_data)  TYPE REF TO ty_tab512
+        RAISING
+                /iwbep/cx_cp_remote
+                /iwbep/cx_gateway
+                cx_web_http_client_error
+                cx_http_dest_provider_error.
+
 
 
 ENDCLASS.
@@ -181,6 +222,28 @@ CLASS zust01_cl_salesorder IMPLEMENTATION.
                                                   it_salesorderitm = lr_t_salesorderitm ).
     ENDIF.
 
+* Get missing SO extension fields
+    ME->get_sales_order_ext( EXPORTING
+                              it_salesorder = lr_t_salesorder
+                              it_salesorderitm = lr_t_salesorderitm  ).
+
+   LOOP AT lt_sched_item ASSIGNING FIELD-SYMBOL(<ls_sched_item>).
+        READ TABLE lt_soext ASSIGNING FIELD-SYMBOL(<ls_soext>)
+            WITH KEY vbeln = <ls_sched_item>-salesorder
+                     posnr = <ls_sched_item>-salesorderitem
+                     etenr = <ls_sched_item>-scheduleline.
+        IF SY-SUBRC = 0.
+               <ls_sched_item>-ArrivalTime = <ls_soext>-ezeit.
+               CONCATENATE <ls_soext>-mbdat '000000' INTO <ls_soext>-mbdat.
+               <ls_sched_item>-MaterialAvailDate = <ls_soext>-mbdat.
+               CONCATENATE <ls_soext>-wadat '000000' INTO <ls_soext>-wadat.
+               <ls_sched_item>-GoodsIssueDate = <ls_soext>-wadat.
+*               <ls_sched_item>-DeliveryBlock = <ls_soext>-lifsp.
+               <ls_sched_item>-MaterialStagTime = <ls_soext>-mbuhr.
+               <ls_sched_item>-GoodsIssueTime = <ls_soext>-wauhr.
+        ENDIF.
+   ENDLOOP.
+
     LOOP AT lt_saleord_hdr ASSIGNING FIELD-SYMBOL(<fs_so_hdr>).
       LOOP AT lt_salesord_itm
           ASSIGNING FIELD-SYMBOL(<fs_so_itm>)
@@ -214,10 +277,25 @@ CLASS zust01_cl_salesorder IMPLEMENTATION.
             <fs_fin_out>-Quantity = <fs_fin_out>-ConfdOrderQtyByMatlAvailCheck - <fs_fin_out>-DeliveredQtyInOrderQtyUnit.
           ENDIF.
 
-
 *          OpenQty
         <fs_fin_out>-OpenQty = <fs_fin_out>-ScheduleLineOrderQuantity - <fs_fin_out>-DeliveredQtyInOrderQtyUnit.
         <fs_fin_out>-Quantity = <fs_fin_out>-ConfdOrderQtyByMatlAvailCheck - <fs_fin_out>-DeliveredQtyInOrderQtyUnit .
+
+* Arrival Time
+          <fs_fin_out>-ArrivalTime     = ls_sched_itm-ArrivalTime.
+
+* Material Availability Date
+          <fs_fin_out>-MaterialAvailDate     = ls_sched_itm-MaterialAvailDate.
+
+* Material Staging Time
+          <fs_fin_out>-MaterialStagTime     = ls_sched_itm-MaterialStagTime.
+
+* Goods Issue Date
+          <fs_fin_out>-GoodsIssueDate     = ls_sched_itm-GoodsIssueDate.
+
+* Goods Issue Time
+          <fs_fin_out>-GoodsIssueTime     = ls_sched_itm-GoodsIssueTime.
+
         ENDIF.
 
       ENDLOOP.
@@ -649,6 +727,165 @@ CLASS zust01_cl_salesorder IMPLEMENTATION.
       CATCH /iwbep/cx_gateway INTO DATA(lx_gateway).
         " Handle Exception
     ENDTRY.
+  ENDMETHOD.
+
+  METHOD get_sales_order_ext.
+*   get missing fields here
+        DATA lv_result TYPE c LENGTH 200.
+
+        DATA(lo_destination) = cl_rfc_destination_provider=>create_by_comm_arrangement(
+
+                            comm_scenario          = 'ZUST_OUTBOUND_RFC_000_CSCEN'   " Communication scenario
+                            service_id             = 'ZUST_OUTBOUND_RFC_000_SRFC'         " Outbound service
+                            comm_system_id         = 'ZUST_OUTBOUND_RFC_CSYS_000'    " Communication system
+
+                         ).
+         DATA(lv_destination) = lo_destination->get_destination_name( ).
+
+    TYPES: BEGIN OF ty_TABOPT,
+            text TYPE c LENGTH 72,
+           END OF ty_TABOPT.
+    DATA: lt_options TYPE STANDARD TABLE OF ty_tabopt,
+            ls_options like line of lt_options,
+            ls_soext LIKE LINE OF lt_soext.
+
+    TYPES: BEGIN OF ty_TABFLD,
+           fieldname TYPE c LENGTH 30,
+           END OF ty_TABFLD.
+    DATA: lt_fields TYPE STANDARD TABLE OF ty_tabfld,
+          ls_fields like line of lt_fields.
+
+    FIELD-SYMBOLS: <ls_data> TYPE any,
+                   <value> TYPE any,
+                   <option> TYPE any.
+
+    DATA: lt_tables TYPE STANDARD TABLE OF ty_tab512,
+       ls_tables TYPE ty_tab512.
+
+* Add required tables
+      ls_tables-wa = 'VBEP'.
+      APPEND ls_tables TO lt_tables.
+*      ls_tables-wa = 'VBAP'.
+*      APPEND ls_tables TO lt_tables.
+*      ls_tables-wa = 'VBAK'.
+*      APPEND ls_tables TO lt_tables.
+
+** Collect the SO data from each table.
+*      LOOP AT lt_tables INTO ls_tables.
+      ASSIGN COMPONENT 'wa' OF STRUCTURE ls_tables to FIELD-SYMBOL(<table>).
+
+* Set fields parameter for table read
+        IF <table> = 'VBEP'.
+            CLEAR: ls_fields, lt_fields.
+            ls_fields-fieldname = 'VBELN'.
+            APPEND ls_fields TO lt_fields.
+            ls_fields-fieldname = 'POSNR'.
+            APPEND ls_fields TO lt_fields.
+            ls_fields-fieldname = 'ETENR'.
+            APPEND ls_fields TO lt_fields.
+            ls_fields-fieldname = 'EZEIT'.
+            APPEND ls_fields TO lt_fields.
+*            ls_fields-fieldname = 'EDATU'.
+*            APPEND ls_fields TO lt_fields.
+            ls_fields-fieldname = 'MBDAT'.
+            APPEND ls_fields TO lt_fields.
+            ls_fields-fieldname = 'MBUHR'.
+            APPEND ls_fields TO lt_fields.
+            ls_fields-fieldname = 'WADAT'.
+            APPEND ls_fields TO lt_fields.
+            ls_fields-fieldname = 'WAUHR'.
+            APPEND ls_fields TO lt_fields.
+            ls_fields-fieldname = 'LIFSP'.
+            APPEND ls_fields TO lt_fields.
+        ELSEIF <table> = 'VBAP'.
+            CLEAR: ls_fields, lt_fields.
+            ls_fields-fieldname = 'ROUTE'.
+            APPEND ls_fields TO lt_fields.
+            ls_fields-fieldname = 'ANTLF'.
+            APPEND ls_fields TO lt_fields.
+        Else.
+            CLEAR: ls_fields, lt_fields.
+            ls_fields-fieldname = 'VSBED'.
+            APPEND ls_fields TO lt_fields.
+            ls_fields-fieldname = 'CMGST'.
+            APPEND ls_fields TO lt_fields.
+            ls_fields-fieldname = 'LIFSk'.
+            APPEND ls_fields TO lt_fields.
+        ENDIF.
+
+* Set options parameter for table read
+        LOOP AT it_salesorder ASSIGNING FIELD-SYMBOL(<fs_salesorder>).
+          CLEAR: ls_options, lt_options.
+*         READ TABLE it_salesorder ASSIGNING FIELD-SYMBOL(<fs_salesorder>) INDEX +1.
+            ASSIGN COMPONENT 'low' of STRUCTURE <fs_salesorder>  TO <value>.
+            CHECK <value> IS ASSIGNED.
+            CONCATENATE `VBELN EQ '00000` <value> `'` INTO ls_options.
+*            ls_options-text = <option>. "0000015628
+            APPEND ls_options TO lt_options.
+*        ENDLOOP.
+
+* Call read table function
+        CALL FUNCTION 'RFC_READ_TABLE'
+          DESTINATION lv_destination
+          EXPORTING
+            QUERY_TABLE                = <table>
+          TABLES
+            FIELDS                     = lt_fields
+            OPTIONS                    = lt_options
+            DATA                       = lt_data.
+** EXCEPTIONS
+**   TABLE_NOT_AVAILABLE        = 1
+**   TABLE_WITHOUT_DATA         = 2
+**   OPTION_NOT_VALID           = 3
+**   FIELD_NOT_VALID            = 4
+**   NOT_AUTHORIZED             = 5
+**   DATA_BUFFER_EXCEEDED       = 6
+**   OTHERS                     = 7
+*          .
+IF sy-subrc <> 0.
+    RETURN.
+ENDIF.
+        CHECK lt_data IS NOT INITIAL.
+
+DATA: lf_tabix TYPE sy-tabix.
+      FIELD-SYMBOLS: <key> TYPE any,
+                     <ls_soext> TYPE any.
+* Fill SO extension fields table
+        IF <table> = 'VBEP'.
+            LOOP AT lt_data ASSIGNING <ls_data>.
+               ls_soext-vbeln = <ls_data>+5(5).
+               ls_soext-posnr = <ls_data>+10(6).
+               ls_soext-etenr = <ls_data>+16(4).
+               ls_soext-ezeit = <ls_data>+20(6).
+               ls_soext-mbdat = <ls_data>+26(8).
+               ls_soext-wadat = <ls_data>+34(8).
+               ls_soext-lifsp = <ls_data>+42(2).
+               ls_soext-mbuhr = <ls_data>+44(6).
+               ls_soext-wauhr = <ls_data>+50(6).
+               APPEND ls_soext to lt_soext.
+            ENDLOOP.
+*        ELSEIF <table> = 'VBAP'.
+*            LOOP AT lt_data ASSIGNING <ls_data>.
+*                ls_soext-route = <ls_data>+1(6).
+*                ls_soext-antlf = <ls_data>(1).
+**                READ TABLE lt_soext ASSIGNING <ls_soext>
+**                    WITH TABLE KEY primary_key
+**                    COMPONENTS EZEIT = <key>.
+*                READ TABLE lt_soext INDEX 1 INTO ls_soext.
+*                IF sy-subrc = 0.
+*                    APPEND ls_soext TO lt_soext.
+*                ENDIF.
+*            ENDLOOP.
+*        ELSE.
+*            LOOP AT lt_data ASSIGNING <ls_data>.
+*                ls_soext-vsbed = <ls_data>(2).
+*                ls_soext-cmgst = <ls_data>+2(1).
+*                ls_soext-lifsk = <ls_data>+3(2).
+*                MODIFY lt_soext FROM ls_soext.
+*            ENDLOOP.
+        ENDIF.
+    ENDLOOP.
+
   ENDMETHOD.
 
 ENDCLASS.

@@ -7,17 +7,18 @@ CLASS zust01_cl_prodallocation DEFINITION
 
     INTERFACES if_oo_adt_classrun .
     INTERFACES if_rap_query_provider.
+    INTERFACES if_rap_query_filter.
 
     TYPES t_prdalc_data         TYPE STANDARD TABLE OF zust01_a_prodallocationobject.
     TYPES t_prdalc_cvc_data     TYPE TABLE OF zust01_a_prodalloccharcvalcomb.
     TYPES t_prdalc_tmesers_data TYPE TABLE OF zust01_a_prodallocobjtimeserie WITH DEFAULT KEY.
-    TYPES t_salesord_itm        TYPE TABLE OF ZUST01_A_SALESORDERITEM WITH DEFAULT KEY
+    TYPES t_salesord_itm        TYPE TABLE OF zust01_a_salesorderitem WITH DEFAULT KEY
                                                                     WITH NON-UNIQUE SORTED KEY key_order COMPONENTS salesorder.
 
-    TYPES t_salesord_hdr        TYPE TABLE OF ZUST01_A_SALESORDER WITH DEFAULT KEY
+    TYPES t_salesord_hdr        TYPE TABLE OF zust01_a_salesorder WITH DEFAULT KEY
                                                                 WITH NON-UNIQUE SORTED KEY key_date COMPONENTS SalesOrderDate.
 
-    TYPES t_salesord_summ       TYPE TABLE OF zst_salesord_summ WITH DEFAULT KEY
+    TYPES t_salesord_summ       TYPE TABLE OF zust01_cs_salesord_summ WITH DEFAULT KEY
                                                                 WITH NON-UNIQUE SORTED KEY key_order COMPONENTS material
                                                                                                                 customergrp
                                                                                                                 soldtoparty
@@ -26,7 +27,11 @@ CLASS zust01_cl_prodallocation DEFINITION
     TYPES t_prdalloc_cvc_demo   TYPE TABLE OF zust01_ce_prodallocation WITH DEFAULT KEY.
     TYPES t_bucket_list         TYPE TABLE OF zst_bucket_list WITH DEFAULT KEY.
     TYPES: rt_dats              TYPE if_rap_query_filter=>tt_range_option.
-    TYPES t_quantity            TYPE zst_salesord_summ-orderqty.
+    TYPES t_quantity            TYPE zust01_cs_salesord_summ-orderqty.
+    TYPES t_currstock           TYPE zust01_cl_stock=>tt_current_stock.
+    TYPES t_floatstock          TYPE TABLE OF zust_cs_floating_stk WITH DEFAULT KEY
+                                                                   WITH NON-UNIQUE SORTED KEY key_material COMPONENTS material
+                                                                                                                      bucketidx.
 
 
     CONSTANTS: BEGIN OF gs_scrrow,
@@ -34,6 +39,7 @@ CLASS zust01_cl_prodallocation DEFINITION
                  ord_qty      TYPE zust01_scrrow-line_name VALUE 'ORDER_INCOMING_QTY',
                  rem_qty      TYPE zust01_scrrow-line_name VALUE 'REMAINING_QTY',
                  rem_qty_perc TYPE zust01_scrrow-line_name VALUE 'REMAINING_QTY_PERCENT',
+                 stk_recpts   TYPE zust01_scrrow-line_name VALUE 'MT_STOCK_AND_RECEIPTS',
                END OF gs_scrrow.
 
 
@@ -81,11 +87,13 @@ CLASS zust01_cl_prodallocation DEFINITION
 * Method to generate the report (Time Series and CVC put together)
     METHODS fill_final_tab
       IMPORTING
-                it_filter_cond TYPE if_rap_query_filter=>tt_name_range_pairs   OPTIONAL
-                it_cvc_data    TYPE t_prdalc_cvc_data
-                it_salesord    TYPE t_salesord_summ
-                it_buckets     TYPE t_bucket_list
-      RETURNING VALUE(rt_data) TYPE t_prdalloc_cvc_demo
+                it_filter_cond       TYPE if_rap_query_filter=>tt_name_range_pairs   OPTIONAL
+                it_cvc_data          TYPE t_prdalc_cvc_data
+                it_salesord          TYPE t_salesord_summ
+                it_buckets           TYPE t_bucket_list
+                it_curr_stock        TYPE t_currstock
+                it_float_stock       TYPE t_floatstock
+      RETURNING VALUE(rt_prod_alloc) TYPE t_prdalloc_cvc_demo
       RAISING
                 /iwbep/cx_cp_remote
                 /iwbep/cx_gateway
@@ -173,11 +181,44 @@ CLASS zust01_cl_prodallocation DEFINITION
                cx_web_http_client_error
                cx_http_dest_provider_error.
 
+*  Get Stock
+    METHODS get_current_stock
+      IMPORTING
+                it_filter_cond       TYPE if_rap_query_filter=>tt_name_range_pairs   OPTIONAL
+                top                  TYPE i OPTIONAL
+                skip                 TYPE i OPTIONAL
+                it_date_range        TYPE rt_dats
+                it_cvc_data          TYPE t_prdalc_cvc_data
+
+      RETURNING VALUE(rt_curr_stock) TYPE  t_currstock
+      RAISING
+                /iwbep/cx_cp_remote
+                /iwbep/cx_gateway
+                cx_web_http_client_error
+                cx_http_dest_provider_error.
+
+*  Get Stock
+    METHODS get_floating_stock
+      IMPORTING
+                it_filter_cond        TYPE if_rap_query_filter=>tt_name_range_pairs   OPTIONAL
+                top                   TYPE i OPTIONAL
+                skip                  TYPE i OPTIONAL
+                it_date_range         TYPE rt_dats
+                it_cvc_data           TYPE t_prdalc_cvc_data
+                it_buckets            TYPE t_bucket_list
+
+      RETURNING VALUE(rt_float_stock) TYPE  t_floatstock
+      RAISING
+                /iwbep/cx_cp_remote
+                /iwbep/cx_gateway
+                cx_web_http_client_error
+                cx_http_dest_provider_error.
+
 ENDCLASS.
 
 
 
-CLASS ZUST01_CL_PRODALLOCATION IMPLEMENTATION.
+CLASS zust01_cl_prodallocation IMPLEMENTATION.
 
 
   METHOD if_oo_adt_classrun~main.
@@ -473,6 +514,8 @@ CLASS ZUST01_CL_PRODALLOCATION IMPLEMENTATION.
     FIELD-SYMBOLS: <fs_any> TYPE any.
 
     TRY.
+
+
         DATA(filter_condition) = io_request->get_filter( )->get_as_ranges( ).
 
 *   Get product allocation
@@ -503,7 +546,6 @@ CLASS ZUST01_CL_PRODALLOCATION IMPLEMENTATION.
 
 *   create date range criteria out of the bucket list
           DATA(lv_endcount) = lines( lt_bucketlist ).
-
           DATA(lr_t_date) = VALUE rt_dats( LET s = 'I'
                                                o = 'BT'
                                            IN sign   = s
@@ -516,13 +558,25 @@ CLASS ZUST01_CL_PRODALLOCATION IMPLEMENTATION.
                                                     it_date_range = lr_t_date
                                                     it_buckets    = lt_bucketlist ).
 
+*       get current stock
+          DATA(lt_curr_stock) = get_current_stock( it_filter_cond = filter_condition
+                                                      it_date_range  = lr_t_date
+                                                      it_cvc_data    = lt_prdalc_cvc_data ).
+
+          DATA(lt_float_stock) = get_floating_stock( it_filter_cond = filter_condition
+                                                    it_date_range  = lr_t_date
+                                                    it_cvc_data    = lt_prdalc_cvc_data
+                                                    it_buckets    = lt_bucketlist ).
+
 *       Processing and validation of data
           DATA(lt_final_data) = fill_final_tab(
                                    EXPORTING
                                      it_filter_cond = filter_condition
                                      it_cvc_data    = lt_prdalc_cvc_data
                                      it_salesord    = lt_salesord
-                                     it_buckets     = lt_bucketlist  ).
+                                     it_buckets     = lt_bucketlist
+                                     it_curr_stock  = lt_curr_stock
+                                     it_float_stock = lt_float_stock  ).
 
 
 *       OData result/push back to web service
@@ -556,6 +610,7 @@ CLASS ZUST01_CL_PRODALLOCATION IMPLEMENTATION.
     LOOP AT lt_salesord_itm ASSIGNING FIELD-SYMBOL(<fs_itm>).
 
       APPEND INITIAL LINE TO rt_salesord ASSIGNING FIELD-SYMBOL(<fs_salesord>).
+      <fs_salesord>-ProductionPlant = <fs_itm>-ProductionPlant.
       <fs_salesord>-material      = <fs_itm>-Material.
       <fs_salesord>-customergrp   = <fs_itm>-CustomerGroup.
       <fs_salesord>-orderqty      = <fs_itm>-RequestedQuantity.
@@ -810,10 +865,11 @@ CLASS ZUST01_CL_PRODALLOCATION IMPLEMENTATION.
 
     TYPES: ltt_line_name    TYPE RANGE OF zust01_scrrow-line_name.
     DATA: lo_struct_descr   TYPE REF TO cl_abap_structdescr.
-    DATA: ls_salesord       LIKE LINE OF it_salesord,
-          ls_data           LIKE LINE OF rt_data,
-          ls_filter_def     TYPE if_rap_query_filter=>ty_name_range_pairs,
-          ls_prodalloc_cvc  TYPE ZUST01_CE_PRODALLOCATION.
+    DATA: ls_salesord      LIKE LINE OF it_salesord,
+          ls_data          LIKE LINE OF rt_prod_alloc,
+          ls_filter_def    TYPE if_rap_query_filter=>ty_name_range_pairs,
+          ls_prodalloc_cvc TYPE zust01_ce_prodallocation,
+          ls_currstk_def   TYPE zust01_materialmultistockbydat.
 
     FIELD-SYMBOLS: <fs_any>    TYPE any,
                    <fs_ordqty> TYPE any,
@@ -845,31 +901,31 @@ CLASS ZUST01_CL_PRODALLOCATION IMPLEMENTATION.
 *  Get the SCRCOL data for CVC Data
     SELECT *
         FROM zust01_scrcol
-         WHERE PLANNING_SCREEN EQ @lv_planning_scr
-           AND CVC_DISPLAY EQ @abap_true
+         WHERE planning_screen EQ @lv_planning_scr
+           AND cvc_display EQ @abap_true
          INTO TABLE @DATA(lt_scrcol).
 
     IF sy-subrc EQ 0.
-        SORT lt_scrcol by sorting ASCENDING.
+      SORT lt_scrcol BY sorting ASCENDING.
 
-        LOOP AT lt_scrcol INTO DATA(ls_scrcol).
-          DATA(lv_tabix) = sy-tabix.
-          DATA(lv_alloccvc) = |ProdAllocCVC0{ lv_tabix }|.
+      LOOP AT lt_scrcol INTO DATA(ls_scrcol).
+        DATA(lv_tabix) = sy-tabix.
+        DATA(lv_alloccvc) = |ProdAllocCVC0{ lv_tabix }|.
 
-          ASSIGN COMPONENT lv_alloccvc OF STRUCTURE ls_prodalloc_cvc TO <fs_any>.
-          <fs_any> = ls_scrcol-description.
+        ASSIGN COMPONENT lv_alloccvc OF STRUCTURE ls_prodalloc_cvc TO <fs_any>.
+        <fs_any> = ls_scrcol-description.
 
-        ENDLOOP.
+      ENDLOOP.
     ENDIF.
 
     LOOP AT it_cvc_data INTO DATA(ls_cvc).
 
-**    ALLOCATION_QTY
+**    001 - ALLOCATION_QTY
       DATA(lv_keyfigure)    = VALUE #( ls_filter_cond-range[ low = gs_scrrow-alc_qty ]-low DEFAULT '' ).
       IF NOT lv_keyfigure IS INITIAL.
 
         DATA(lv_keyfigure_dsc)  = VALUE #( lt_scrrow[ line_name = lv_keyfigure ]-description DEFAULT '' ).
-        APPEND INITIAL LINE TO rt_data ASSIGNING FIELD-SYMBOL(<fs_data>).
+        APPEND INITIAL LINE TO rt_prod_alloc ASSIGNING FIELD-SYMBOL(<fs_data>).
 
         <fs_data> = CORRESPONDING #( ls_cvc ).
         <fs_data>-KeyFigure = lv_keyfigure_dsc.
@@ -930,13 +986,13 @@ CLASS ZUST01_CL_PRODALLOCATION IMPLEMENTATION.
 
       ENDIF.
 
-**    ORDER_INCOMING_QTY
+**    002 - ORDER_INCOMING_QTY
       lv_keyfigure = VALUE #( ls_filter_cond-range[ low = gs_scrrow-ord_qty ]-low DEFAULT '' ).
       IF NOT lv_keyfigure IS INITIAL.
 
         lv_keyfigure_dsc  = VALUE #( lt_scrrow[ line_name = lv_keyfigure ]-description DEFAULT '' ).
 
-        APPEND INITIAL LINE TO rt_data ASSIGNING <fs_data>.
+        APPEND INITIAL LINE TO rt_prod_alloc ASSIGNING <fs_data>.
         <fs_data> = CORRESPONDING #( ls_cvc ).
         <fs_data>-KeyFigure = lv_keyfigure_dsc.
         <fs_data>-KeyFigureID = 2.
@@ -963,7 +1019,7 @@ CLASS ZUST01_CL_PRODALLOCATION IMPLEMENTATION.
                     ls_salesord-soldtoparty NO-GAPS.
 
 
-          DATA(lv_value) = REDUCE #( INIT val TYPE zst_salesord_summ-orderqty
+          DATA(lv_value) = REDUCE #( INIT val TYPE zust_cs_floating_stk-mrpavailablequantity
                                        FOR wa IN
                                        FILTER #( it_salesord
                                                  USING KEY key_order
@@ -981,14 +1037,14 @@ CLASS ZUST01_CL_PRODALLOCATION IMPLEMENTATION.
 
 
 
-**   REMAINING_QTY_PERCENT
+**    REMAINING_QTY_PERCENT
       lv_keyfigure = VALUE #( ls_filter_cond-range[ low = gs_scrrow-rem_qty_perc ]-low DEFAULT '' ).
       IF NOT lv_keyfigure IS INITIAL.
 
         lv_keyfigure_dsc  = VALUE #( lt_scrrow[ line_name = lv_keyfigure ]-description DEFAULT '' ).
 
 
-        APPEND INITIAL LINE TO rt_data ASSIGNING <fs_data>.
+        APPEND INITIAL LINE TO rt_prod_alloc ASSIGNING <fs_data>.
         <fs_data> = CORRESPONDING #( ls_cvc ).
         <fs_data>-KeyFigure = lv_keyfigure_dsc.
         <fs_data>-KeyFigureID = 3.
@@ -1001,13 +1057,13 @@ CLASS ZUST01_CL_PRODALLOCATION IMPLEMENTATION.
       ENDIF.
 
 
-**   REMAINING_QTY
+**   003 - REMAINING_QTY
       lv_keyfigure = VALUE #( ls_filter_cond-range[ low = gs_scrrow-rem_qty ]-low DEFAULT '' ).
       IF NOT lv_keyfigure IS INITIAL.
 
         lv_keyfigure_dsc  = VALUE #( lt_scrrow[ line_name = lv_keyfigure ]-description DEFAULT '' ).
 
-        APPEND INITIAL LINE TO rt_data ASSIGNING <fs_data>.
+        APPEND INITIAL LINE TO rt_prod_alloc ASSIGNING <fs_data>.
         <fs_data> = CORRESPONDING #( ls_cvc ).
         <fs_data>-KeyFigure = lv_keyfigure_dsc.
         <fs_data>-KeyFigureID = 4.
@@ -1021,19 +1077,19 @@ CLASS ZUST01_CL_PRODALLOCATION IMPLEMENTATION.
 
 
 *    Get the data from Allocation Quantity for computation
-        DATA(ls_prodalloc) = VALUE #( rt_data[ ProdAllocCharc01 = ls_salesord-material
+        DATA(ls_prodalloc) = VALUE #( rt_prod_alloc[ ProdAllocCharc01 = ls_salesord-material
                                         ProdAllocCharc02 = ls_salesord-customergrp
                                         ProdAllocCharc03 = ls_cvc-ProdAllocCharc03
                                         KeyFigureID      = 1 ] DEFAULT ls_data ).
 
 *    Get the data from Incoming Order for computation
-        DATA(ls_ordqty) = VALUE #( rt_data[ ProdAllocCharc01 = ls_salesord-material
+        DATA(ls_ordqty) = VALUE #( rt_prod_alloc[ ProdAllocCharc01 = ls_salesord-material
                                         ProdAllocCharc02 = ls_salesord-customergrp
                                         ProdAllocCharc03 = ls_cvc-ProdAllocCharc03
                                         KeyFigureID      = 2 ] DEFAULT ls_data ).
 
 *   Get and Assign the Remaining Quantity Percent
-        READ TABLE rt_data
+        READ TABLE rt_prod_alloc
           WITH KEY ProdAllocCharc01 = ls_salesord-material
                    ProdAllocCharc02 = ls_salesord-customergrp
                    ProdAllocCharc03 = ls_cvc-ProdAllocCharc03
@@ -1099,20 +1155,92 @@ CLASS ZUST01_CL_PRODALLOCATION IMPLEMENTATION.
 
       ENDIF.
 
-    ENDLOOP.
+**   004 - MT_STOCK_AND_RECEIPTS
+      lv_keyfigure = VALUE #( ls_filter_cond-range[ low = gs_scrrow-stk_recpts ]-low DEFAULT '' ).
+      IF NOT lv_keyfigure IS INITIAL.
 
-  ENDMETHOD.
 
 
-  METHOD get_domvalues_get.
+        lv_keyfigure_dsc  = VALUE #( lt_scrrow[ line_name = lv_keyfigure ]-description DEFAULT '' ).
+
+        APPEND INITIAL LINE TO rt_prod_alloc ASSIGNING <fs_data>.
+        <fs_data> = CORRESPONDING #( ls_cvc ).
+        <fs_data>-KeyFigure = lv_keyfigure_dsc.
+        <fs_data>-KeyFigureID = 4.
+
+*        Clear quantity data.
+        clear_quantity( CHANGING cs_data = <fs_data> ).
+
+        DATA(lv_curr_stock) = VALUE #( it_curr_stock[ Material = ls_cvc-ProdAllocCharc01  ]-CurrentStock DEFAULT 0 ).
+        <fs_data>-ProductAllocationQty1 = lv_curr_stock.
+
+
+*     sets the order
+        LOOP AT it_buckets ASSIGNING <fs_bucket>.
+          lv_tabix = sy-tabix.
+          DATA(lv_bucket_qty) = |ProductAllocationQty{ lv_tabix }|.
+
+          ASSIGN COMPONENT lv_bucket_qty OF STRUCTURE <fs_data> TO <fs_any>.
+
+
+          DATA(lv_material) = ls_cvc-ProdAllocCharc01.
+
+          CONDENSE: lv_material NO-GAPS.
+
+
+          DATA(lv_flt_qty) = REDUCE #( INIT val TYPE zust_cs_floating_stk-mrpavailablequantity
+                                       FOR wa_floatstk IN
+                                       FILTER #( it_float_stock
+                                                 USING KEY key_material
+                                                 WHERE material      EQ lv_material
+                                                   AND bucketidx     EQ lv_tabix  )
+                                       NEXT val = val + wa_floatstk-mrpavailablequantity ).
+
+          <fs_any> = <fs_any> + lv_flt_qty.
+        ENDLOOP.
+
+
+
+
+    ENDIF.
+
+**   005 - Stock and receipts, cumulated
+    lv_keyfigure = VALUE #( ls_filter_cond-range[ low = gs_scrrow-stk_recpts ]-low DEFAULT '' ).
+    IF NOT lv_keyfigure IS INITIAL.
+
+
+
+      lv_keyfigure_dsc  = VALUE #( lt_scrrow[ line_name = lv_keyfigure ]-description DEFAULT '' ).
+
+      APPEND INITIAL LINE TO rt_prod_alloc ASSIGNING <fs_data>.
+      <fs_data> = CORRESPONDING #( ls_cvc ).
+      <fs_data>-KeyFigure = lv_keyfigure_dsc.
+      <fs_data>-KeyFigureID = 4.
+
+*        Clear quantity data.
+*      clear_quantity( CHANGING cs_data = <fs_data> ).
+
+*        DATA(lv_curr_stock) = VALUE #( it_curr_stock[ Material = ls_cvc-ProdAllocCharc01  ]-CurrentStock DEFAULT 0 ).
+      <fs_data>-ProductAllocationQty1 = lv_curr_stock.
+
+
+    ENDIF.
+
+
+  ENDLOOP.
+
+ENDMETHOD.
+
+
+METHOD get_domvalues_get.
 
 *    SELECT *
 *        FROM dd07l
 *        INTO TABLE @DATA(lt_table).
 
-    IF sy-subrc EQ 0.
+  IF sy-subrc EQ 0.
 
-    ENDIF.
+  ENDIF.
 *    IF bypass_buffer = 'X'.
 *       SELECT * FROM dd07l BYPASSING BUFFER
 *              WHERE domname   = domname AND
@@ -1130,22 +1258,204 @@ CLASS ZUST01_CL_PRODALLOCATION IMPLEMENTATION.
 *    ENDIF.
 *
 *    rc = sy-subrc.
+ENDMETHOD.
+
+
+METHOD clear_quantity.
+  CLEAR:
+        cs_data-ProductAllocationQty1,
+        cs_data-ProductAllocationQty2,
+        cs_data-ProductAllocationQty3,
+        cs_data-ProductAllocationQty4,
+        cs_data-ProductAllocationQty5,
+        cs_data-ProductAllocationQty6,
+        cs_data-ProductAllocationQty7,
+        cs_data-ProductAllocationQty8,
+        cs_data-ProductAllocationQty9,
+        cs_data-ProductAllocationQty10,
+        cs_data-ProductAllocationQty11,
+        cs_data-ProductAllocationQty12.
+ENDMETHOD.
+
+
+METHOD get_current_stock.
+*> Start of modification
+  TYPES: ltt_line_name    TYPE RANGE OF zust01_scrrow-line_name.
+  DATA: ls_filter_def     TYPE if_rap_query_filter=>ty_name_range_pairs.
+  DATA(lo_stock) = NEW zust01_cl_stock(  ).
+
+
+
+  SELECT DISTINCT ProdAllocCharc01
+      FROM @it_cvc_data AS a
+      INTO TABLE @DATA(lt_material).
+    IF sy-subrc EQ 0.
+
+    ENDIF.
+
+
+
+
+*  Get the KeyFigures From the filters coming from UI
+    DATA(lr_t_material)   = VALUE if_rap_query_filter=>tt_range_option( FOR lwa_material IN lt_material
+                                                                        LET s = 'I'
+                                                                           o = 'EQ'
+                                                                        IN sign   = s
+                                                                           option = o
+                                                                    ( low = lwa_material-ProdAllocCharc01 ) ).
+* ( low = 'MTAMC5'  )
+
+    DATA(lt_filter) = VALUE if_rap_query_filter=>tt_name_range_pairs(
+                                                                      ( name = 'MATERIAL'
+                                                                        range = lr_t_material ) ).
+
+
+*    GET TIME STAMP FIELD DATA(ts).
+
+    DATA: lv_calendar_dt TYPE rap_cp_odata_v2_edm_datetime.
+
+
+    lv_calendar_dt = sy-datum.
+    DATA(lr_t_date) = VALUE rt_dats( LET s = 'I'
+                                                   o = 'GE'
+                                               IN sign   = s
+                                                  option = o
+                                             ( low  = |{ sy-datum }000000.0000000| ) ).
+*low  = |{ sy-datum }000000.0000000 |
+*    DATA(lt_filter) = VALUE if_rap_query_filter=>tt_name_range_pairs(
+*                                                                      ( name = 'CALENDARDATE'
+*                                                                        range = lr_t_date ) ).
+
+
+
+    rt_curr_stock = lo_stock->get_stock( EXPORTING
+                                           it_filter_cond = lt_filter ).
+
+
+
+*< End of modification
   ENDMETHOD.
 
 
-  METHOD clear_quantity.
-    CLEAR:
-          cs_data-ProductAllocationQty1,
-          cs_data-ProductAllocationQty2,
-          cs_data-ProductAllocationQty3,
-          cs_data-ProductAllocationQty4,
-          cs_data-ProductAllocationQty5,
-          cs_data-ProductAllocationQty6,
-          cs_data-ProductAllocationQty7,
-          cs_data-ProductAllocationQty8,
-          cs_data-ProductAllocationQty9,
-          cs_data-ProductAllocationQty10,
-          cs_data-ProductAllocationQty11,
-          cs_data-ProductAllocationQty12.
-  ENDMETHOD.
+  METHOD get_floating_stock.
+    TYPES: ltt_line_name    TYPE RANGE OF zust01_scrrow-line_name.
+    DATA: ls_filter_def     TYPE if_rap_query_filter=>ty_name_range_pairs.
+    DATA(lo_stock) = NEW zust01_cl_stock(  ).
+
+
+
+    SELECT DISTINCT ProdAllocCharc01
+        FROM @it_cvc_data AS a
+        INTO TABLE @DATA(lt_material).
+      IF sy-subrc EQ 0.
+
+      ENDIF.
+
+
+
+
+*  Generate material filter for pulling the data
+      DATA(lr_t_material)   = VALUE if_rap_query_filter=>tt_range_option( FOR lwa_material IN lt_material
+                                                                          LET s = 'I'
+                                                                             o = 'EQ'
+                                                                          IN sign   = s
+                                                                             option = o
+                                                                      ( low = lwa_material-ProdAllocCharc01 ) ).
+
+
+**  Generate allowed Material Element Category
+      DATA(lr_t_matelemcat)   = VALUE if_rap_query_filter=>tt_range_option(
+                                                                          LET s = 'I'
+                                                                             o = 'EQ'
+                                                                          IN sign   = s
+                                                                             option = o
+                                                                      ( low = 'VC' )
+                                                                      ( low = 'PA' )
+                                                                      ( low = 'FE' )
+                                                                      ( low = 'VJ' )
+                                                                      ( low = 'BA' )
+                                                                      ( low = 'BA' ) ).
+
+      DATA(lt_filter) = VALUE if_rap_query_filter=>tt_name_range_pairs(
+                                                                        ( name = 'MATERIAL'
+                                                                          range = lr_t_material )
+                                                                        ).
+
+
+      DATA(lt_float_stk) = lo_stock->get_floating_stock( EXPORTING
+                                                           it_filter_cond = lt_filter ).
+
+
+      SELECT a~*
+          FROM @lt_float_stk AS a
+              WHERE mrpelementcategory IN @lr_t_matelemcat
+                AND mrpelementavailyorrqmtdate IN @it_date_range
+              INTO TABLE @DATA(lt_float_stk_fin).
+        IF sy-subrc EQ 0.
+
+          LOOP AT lt_float_stk_fin ASSIGNING FIELD-SYMBOL(<fs_float_stk>).
+
+            APPEND INITIAL LINE TO rt_float_stock ASSIGNING FIELD-SYMBOL(<fs_return>).
+            <fs_return> = CORRESPONDING #( <fs_float_stk> ).
+
+
+
+            CONVERT TIME STAMP <fs_float_stk>-MRPElementAvailyOrRqmtDate TIME ZONE sy-zonlo
+                INTO DATE DATA(lv_date) TIME DATA(lv_time)
+                DAYLIGHT SAVING TIME DATA(lv_dst).
+
+
+            LOOP AT it_buckets INTO DATA(ls_buckets).
+
+
+              IF lv_date GE ls_buckets-tstfr
+               AND lv_date LE ls_buckets-tstto.
+
+                <fs_return>-bucketidx = ls_buckets-column_idx.
+                EXIT.
+              ENDIF.
+
+            ENDLOOP.
+
+          ENDLOOP.
+*      LOOP AT lt_salesord_itm ASSIGNING FIELD-SYMBOL(<fs_itm>).
+*
+*        APPEND INITIAL LINE TO rt_salesord ASSIGNING FIELD-SYMBOL(<fs_salesord>).
+*        <fs_salesord>-ProductionPlant = <fs_itm>-ProductionPlant.
+*        <fs_salesord>-material      = <fs_itm>-Material.
+*        <fs_salesord>-customergrp   = <fs_itm>-CustomerGroup.
+*        <fs_salesord>-orderqty      = <fs_itm>-RequestedQuantity.
+*        <fs_salesord>-soldtoparty   = VALUE #( lt_saleord_hdr[ SalesOrder = <fs_itm>-salesorder ]-SoldToParty DEFAULT '' ).
+*
+*        CONVERT TIME STAMP VALUE #( lt_saleord_hdr[ SalesOrder = <fs_itm>-salesorder ]-SalesOrderDate DEFAULT '' ) TIME ZONE 'PST'
+*            INTO DATE DATA(lv_date) TIME DATA(lv_time)
+*            DAYLIGHT SAVING TIME DATA(lv_dst).
+*
+*        LOOP AT it_buckets INTO DATA(ls_buckets).
+*
+*          IF lv_date GE ls_buckets-tstfr
+*           AND lv_date LE ls_buckets-tstto.
+*
+*            <fs_salesord>-bucketidx = ls_buckets-column_idx.
+*            EXIT.
+*          ENDIF.
+*
+*        ENDLOOP.
+*
+*      ENDLOOP.
+*
+*      IF lines( rt_salesord ) GT 0.
+*        SORT rt_salesord BY material
+*                            customergrp
+*                            soldtoparty.
+*      ENDIF.
+
+
+
+        ENDIF.
+*
+
+      ENDMETHOD.
+
+
 ENDCLASS.

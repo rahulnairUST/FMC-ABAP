@@ -155,5 +155,19 @@ define custom entity ZUST01_CE_SALESORDER_01
       CreatedByUser : abap.char( 12 ) ; 
       CustomerPriceGroup : abap.char( 2 ) ; 
       ConfirmedDeliveryDate : rap_cp_odata_v2_edm_datetime ; 
+      ArrivalTime : abap.char( 6 );
+      MaterialAvailDate : rap_cp_odata_v2_edm_datetime;
+      MaterialStagTime : abap.char( 6 ); 
+      GoodsIssueDate : rap_cp_odata_v2_edm_datetime;
+      GoodsIssueTime : abap.char( 6 );
+      CreditStatus : abap.char( 1 );
+      MaxPartDelv : abap.dec( 1 );
+      BOPStatus : abap.char( 60 );
+      BOPStatusText : abap.char( 60 );
+      BOPStatusIcon : abap.char( 4 );
+      BOPConfStatus : abap.char( 60 );
+      BOPCOnfStatusText : abap.char( 60 );
+      BOPConfStatusIcon : abap.char( 4 );
+      
       
 }
