@@ -1,0 +1,13 @@
+unmanaged implementation in class zbp_ust01_ce_scrrow unique;
+strict ( 2 );
+
+define behavior for ZUST01_CE_SCRROW //alias <alias_name>
+//late numbering
+lock master
+authorization master ( instance )
+//etag master <field_name>
+{
+  create;
+  update;
+  delete;
+}

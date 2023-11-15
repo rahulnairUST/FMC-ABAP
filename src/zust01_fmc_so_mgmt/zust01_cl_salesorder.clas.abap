@@ -140,7 +140,7 @@ ENDCLASS.
 
 
 
-CLASS zust01_cl_salesorder IMPLEMENTATION.
+CLASS ZUST01_CL_SALESORDER IMPLEMENTATION.
 
 
   METHOD if_oo_adt_classrun~main.
@@ -303,6 +303,7 @@ CLASS zust01_cl_salesorder IMPLEMENTATION.
 
 
   ENDMETHOD.
+
 
   METHOD get_salesord_itm.
 
@@ -474,6 +475,7 @@ CLASS zust01_cl_salesorder IMPLEMENTATION.
     ENDTRY.
   ENDMETHOD.
 
+
   METHOD get_salesorder_hdr.
 
     TYPES: BEGIN OF ty_filter_cond,
@@ -633,6 +635,7 @@ CLASS zust01_cl_salesorder IMPLEMENTATION.
     ENDTRY.
   ENDMETHOD.
 
+
   METHOD custom_calculation.
 
   ENDMETHOD.
@@ -729,8 +732,9 @@ CLASS zust01_cl_salesorder IMPLEMENTATION.
     ENDTRY.
   ENDMETHOD.
 
+
   METHOD get_sales_order_ext.
-*   get missing fields here
+* Get missing fields here
         DATA lv_result TYPE c LENGTH 200.
 
         DATA(lo_destination) = cl_rfc_destination_provider=>create_by_comm_arrangement(
@@ -887,5 +891,4 @@ DATA: lf_tabix TYPE sy-tabix.
     ENDLOOP.
 
   ENDMETHOD.
-
 ENDCLASS.

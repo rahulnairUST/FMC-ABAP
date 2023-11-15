@@ -33,13 +33,17 @@ CLASS zust01_cl_prodallocation DEFINITION
                                                                    WITH NON-UNIQUE SORTED KEY key_material COMPONENTS material
                                                                                                                       bucketidx.
 
+    TYPES: gty_t_scrrow TYPE TABLE OF zust01_scrrow WITH DEFAULT KEY.
+
+    DATA: gs_selid_d TYPE zust01_selid_d.
 
     CONSTANTS: BEGIN OF gs_scrrow,
-                 alc_qty      TYPE zust01_scrrow-line_name VALUE 'ALLOCATION_QTY',
-                 ord_qty      TYPE zust01_scrrow-line_name VALUE 'ORDER_INCOMING_QTY',
-                 rem_qty      TYPE zust01_scrrow-line_name VALUE 'REMAINING_QTY',
-                 rem_qty_perc TYPE zust01_scrrow-line_name VALUE 'REMAINING_QTY_PERCENT',
-                 stk_recpts   TYPE zust01_scrrow-line_name VALUE 'MT_STOCK_AND_RECEIPTS',
+                 alc_qty           TYPE zust01_scrrow-line_name VALUE 'ALLOCATION_QTY',
+                 ord_qty           TYPE zust01_scrrow-line_name VALUE 'ORDER_INCOMING_QTY',
+                 rem_qty           TYPE zust01_scrrow-line_name VALUE 'REMAINING_QTY',
+                 rem_qty_perc      TYPE zust01_scrrow-line_name VALUE 'REMAINING_QTY_PERCENT',
+                 stk_recpts        TYPE zust01_scrrow-line_name VALUE 'MT_STOCK_AND_RECEIPTS',
+                 stk_recpts_cumltd TYPE zust01_scrrow-line_name VALUE 'MT_STOCK_AND_RECEIPTS_CUM',
                END OF gs_scrrow.
 
 
@@ -214,11 +218,27 @@ CLASS zust01_cl_prodallocation DEFINITION
                 cx_web_http_client_error
                 cx_http_dest_provider_error.
 
+
+*    Fill-in Time Series Data to the final table
+      METHODS m_fill_allocation_qty
+      IMPORTING
+          is_cvc_keyflds TYPE zust01_ce_prodallocation
+          is_cvc_data    TYPE zust01_a_prodalloccharcvalcomb
+          is_keyfigures  TYPE if_rap_query_filter=>ty_name_range_pairs
+          it_scrrow      TYPE gty_t_scrrow
+          it_buckets     TYPE t_bucket_list
+          it_filter_cond TYPE if_rap_query_filter=>tt_name_range_pairs   OPTIONAL
+      RETURNING VALUE(rt_prodalloc) TYPE t_prdalloc_cvc_demo
+      RAISING
+                /iwbep/cx_cp_remote
+                /iwbep/cx_gateway
+                cx_web_http_client_error
+                cx_http_dest_provider_error.
 ENDCLASS.
 
 
 
-CLASS zust01_cl_prodallocation IMPLEMENTATION.
+CLASS ZUST01_CL_PRODALLOCATION IMPLEMENTATION.
 
 
   METHOD if_oo_adt_classrun~main.
@@ -270,7 +290,7 @@ CLASS zust01_cl_prodallocation IMPLEMENTATION.
     lo_filter_factory = lo_request->create_filter_factory( ).
 
     DATA(lt_filter_cond) = it_filter_cond[].
-    DELETE lt_filter_cond WHERE name <> 'PLANNINGSCREEN'.  "'PRODALLOCPERDSTARTUTCDATETIME'.
+    DELETE lt_filter_cond WHERE name <> 'PLANNINGSCREEN'.
 
     IF lines( lt_filter_cond ) GT 0.
       DATA(lv_planning_scr) = VALUE #( lt_filter_cond[ 1 ]-range[ 1 ]-low DEFAULT '' ).
@@ -558,15 +578,17 @@ CLASS zust01_cl_prodallocation IMPLEMENTATION.
                                                     it_date_range = lr_t_date
                                                     it_buckets    = lt_bucketlist ).
 
+
+          DATA(lt_float_stock) = get_floating_stock( it_filter_cond = filter_condition
+                                                      it_date_range  = lr_t_date
+                                                      it_cvc_data    = lt_prdalc_cvc_data
+                                                      it_buckets    = lt_bucketlist ).
 *       get current stock
           DATA(lt_curr_stock) = get_current_stock( it_filter_cond = filter_condition
                                                       it_date_range  = lr_t_date
                                                       it_cvc_data    = lt_prdalc_cvc_data ).
 
-          DATA(lt_float_stock) = get_floating_stock( it_filter_cond = filter_condition
-                                                    it_date_range  = lr_t_date
-                                                    it_cvc_data    = lt_prdalc_cvc_data
-                                                    it_buckets    = lt_bucketlist ).
+
 
 *       Processing and validation of data
           DATA(lt_final_data) = fill_final_tab(
@@ -876,7 +898,7 @@ CLASS zust01_cl_prodallocation IMPLEMENTATION.
                    <fs_remqty> TYPE any.
 
 *  Get the KeyFigures From the filters coming from UI
-    DATA(ls_filter_cond)  = VALUE #( it_filter_cond[ name = 'KEYFIGURE' ] DEFAULT ls_filter_def ).
+    DATA(ls_filter_cond) = VALUE #( it_filter_cond[ name = 'KEYFIGURE' ] DEFAULT ls_filter_def ).
     DATA(lr_t_line_name) = VALUE ltt_line_name( FOR lwa_line_name IN ls_filter_cond-range
                                                   LET s = 'I'
                                                       o = 'EQ'
@@ -887,7 +909,7 @@ CLASS zust01_cl_prodallocation IMPLEMENTATION.
 
 *  Get the SCRROW data for description reference
     SELECT *
-        FROM zust01_scrrow
+        FROM zust01_scrrow_01
          WHERE line_name IN @lr_t_line_name
          INTO TABLE @DATA(lt_scrrow).
 
@@ -1171,7 +1193,19 @@ CLASS zust01_cl_prodallocation IMPLEMENTATION.
 *        Clear quantity data.
         clear_quantity( CHANGING cs_data = <fs_data> ).
 
+*       Unrestricted [STOCK_UNRESTRICTED]
+
         DATA(lv_curr_stock) = VALUE #( it_curr_stock[ Material = ls_cvc-ProdAllocCharc01  ]-CurrentStock DEFAULT 0 ).
+
+
+        IF gs_selid_d-stock_blocked IS INITIAL.
+          lv_curr_stock = lv_curr_stock + VALUE #( it_curr_stock[ Material = ls_cvc-ProdAllocCharc01  ]-BlockedStockQuantity DEFAULT 0 ).
+        ENDIF.
+
+        IF gs_selid_d-stock_safety IS INITIAL.
+          lv_curr_stock = lv_curr_stock + VALUE #( it_curr_stock[ Material = ls_cvc-ProdAllocCharc01  ]-QualityInspectionStockQuantity DEFAULT 0 ).
+        ENDIF.
+
         <fs_data>-ProductAllocationQty1 = lv_curr_stock.
 
 
@@ -1202,45 +1236,45 @@ CLASS zust01_cl_prodallocation IMPLEMENTATION.
 
 
 
-    ENDIF.
+      ENDIF.
 
 **   005 - Stock and receipts, cumulated
-    lv_keyfigure = VALUE #( ls_filter_cond-range[ low = gs_scrrow-stk_recpts ]-low DEFAULT '' ).
-    IF NOT lv_keyfigure IS INITIAL.
+      lv_keyfigure = VALUE #( ls_filter_cond-range[ low = gs_scrrow-stk_recpts_cumltd ]-low DEFAULT '' ).
+      IF NOT lv_keyfigure IS INITIAL.
 
 
 
-      lv_keyfigure_dsc  = VALUE #( lt_scrrow[ line_name = lv_keyfigure ]-description DEFAULT '' ).
+        lv_keyfigure_dsc  = VALUE #( lt_scrrow[ line_name = lv_keyfigure ]-description DEFAULT '' ).
 
-      APPEND INITIAL LINE TO rt_prod_alloc ASSIGNING <fs_data>.
-      <fs_data> = CORRESPONDING #( ls_cvc ).
-      <fs_data>-KeyFigure = lv_keyfigure_dsc.
-      <fs_data>-KeyFigureID = 4.
+        APPEND INITIAL LINE TO rt_prod_alloc ASSIGNING <fs_data>.
+        <fs_data> = CORRESPONDING #( ls_cvc ).
+        <fs_data>-KeyFigure = lv_keyfigure_dsc.
+        <fs_data>-KeyFigureID = 4.
 
 *        Clear quantity data.
 *      clear_quantity( CHANGING cs_data = <fs_data> ).
 
 *        DATA(lv_curr_stock) = VALUE #( it_curr_stock[ Material = ls_cvc-ProdAllocCharc01  ]-CurrentStock DEFAULT 0 ).
-      <fs_data>-ProductAllocationQty1 = lv_curr_stock.
+        <fs_data>-ProductAllocationQty1 = lv_curr_stock.
 
 
-    ENDIF.
+      ENDIF.
 
 
-  ENDLOOP.
+    ENDLOOP.
 
-ENDMETHOD.
+  ENDMETHOD.
 
 
-METHOD get_domvalues_get.
+  METHOD get_domvalues_get.
 
 *    SELECT *
 *        FROM dd07l
 *        INTO TABLE @DATA(lt_table).
 
-  IF sy-subrc EQ 0.
+    IF sy-subrc EQ 0.
 
-  ENDIF.
+    ENDIF.
 *    IF bypass_buffer = 'X'.
 *       SELECT * FROM dd07l BYPASSING BUFFER
 *              WHERE domname   = domname AND
@@ -1258,37 +1292,313 @@ METHOD get_domvalues_get.
 *    ENDIF.
 *
 *    rc = sy-subrc.
-ENDMETHOD.
+  ENDMETHOD.
 
 
-METHOD clear_quantity.
-  CLEAR:
-        cs_data-ProductAllocationQty1,
-        cs_data-ProductAllocationQty2,
-        cs_data-ProductAllocationQty3,
-        cs_data-ProductAllocationQty4,
-        cs_data-ProductAllocationQty5,
-        cs_data-ProductAllocationQty6,
-        cs_data-ProductAllocationQty7,
-        cs_data-ProductAllocationQty8,
-        cs_data-ProductAllocationQty9,
-        cs_data-ProductAllocationQty10,
-        cs_data-ProductAllocationQty11,
-        cs_data-ProductAllocationQty12.
-ENDMETHOD.
+  METHOD clear_quantity.
+    CLEAR:
+          cs_data-ProductAllocationQty1,
+          cs_data-ProductAllocationQty2,
+          cs_data-ProductAllocationQty3,
+          cs_data-ProductAllocationQty4,
+          cs_data-ProductAllocationQty5,
+          cs_data-ProductAllocationQty6,
+          cs_data-ProductAllocationQty7,
+          cs_data-ProductAllocationQty8,
+          cs_data-ProductAllocationQty9,
+          cs_data-ProductAllocationQty10,
+          cs_data-ProductAllocationQty11,
+          cs_data-ProductAllocationQty12.
+  ENDMETHOD.
 
 
-METHOD get_current_stock.
+  METHOD get_floating_stock.
+
+*    DATA: ls_filter_def     TYPE if_rap_query_filter=>ty_name_range_pairs.
+    DATA(lo_stock) = NEW zust01_cl_stock(  ).
+
+    DATA: lo_tabtype     TYPE REF TO cl_abap_tabledescr,
+          lo_struct_type TYPE REF TO cl_abap_structdescr,
+          lr_data        TYPE REF TO data,
+          lt_comp_tab    TYPE cl_abap_structdescr=>component_table,
+          ls_comp_fld    TYPE cl_abap_structdescr=>component.
+
+    FIELD-SYMBOLS: <fs_tab> TYPE ANY TABLE,
+                   <fs_fld> TYPE any.
+
+
+    DATA:
+        lo_ref TYPE REF TO data.
+
+
+
+    SELECT SINGLE *
+        FROM zust01_selid
+            WHERE selection_id = 'ZFMC_STOCK_AND_RECEIPTS'
+            INTO @DATA(ls_zust01_selid).
+
+    IF sy-subrc EQ 0.
+      DATA(lv_table_name) = |zust01_selid_{ ls_zust01_selid-source  }|.
+      TRANSLATE lv_table_name TO UPPER CASE.
+
+      CREATE DATA lo_ref TYPE TABLE OF (lv_table_name).
+
+
+      lo_struct_type ?= cl_abap_typedescr=>describe_by_name( lv_table_name ).
+      lt_comp_tab  = lo_struct_type->get_components( ).
+      lo_struct_type = cl_abap_structdescr=>create( lt_comp_tab ).
+      lo_tabtype     = cl_abap_tabledescr=>create( lo_struct_type ).
+
+      CREATE DATA lr_data TYPE HANDLE lo_tabtype.
+      ASSIGN lr_data->* TO <fs_tab>.
+
+
+      SELECT *
+          FROM (lv_table_name)
+              WHERE selection_id  = 'ZFMC_STOCK_AND_RECEIPTS'
+              INTO TABLE @<fs_tab>.
+
+      IF sy-subrc EQ 0.
+
+        IF lv_table_name = 'ZUST01_SELID_D'.
+
+          LOOP AT <fs_tab> ASSIGNING FIELD-SYMBOL(<fs>).
+
+            gs_selid_d = CORRESPONDING #( <fs> ).
+            IF <fs> IS NOT INITIAL.
+              EXIT.
+            ENDIF.
+
+          ENDLOOP.
+
+
+**  Generate allowed Material Element Category
+          DATA(lr_t_matelemcat) = VALUE if_rap_query_filter=>tt_range_option( ).
+          LOOP AT lt_comp_tab ASSIGNING FIELD-SYMBOL(<fs_comp>).
+
+            ASSIGN COMPONENT <fs_comp>-name OF STRUCTURE gs_selid_d TO <fs_fld>.
+            DATA(lr_s_range) = VALUE if_rap_query_filter=>ty_range_option( sign = 'I'
+                                                                              option = 'EQ' ).
+
+            IF NOT <fs_fld> IS INITIAL.
+              CASE <fs_comp>-name.
+
+                WHEN 'SHIPPING_NOTIFICATIONS'.
+                  lr_s_range-low = 'LA'.
+                  APPEND lr_s_range TO lr_t_matelemcat.
+
+
+                WHEN 'NO_RECEIPTS_IN_PAST'.
+*                            TBD
+                WHEN 'DELIVERIES'.
+                  lr_s_range-low = 'VJ'.
+                  APPEND lr_s_range TO lr_t_matelemcat.
+
+                WHEN 'RESERVATIONS'.
+                  lr_s_range-low = 'MR'.
+                  APPEND lr_s_range TO lr_t_matelemcat.
+
+
+                WHEN 'DEPENDENT_REQUIREMENTS'.
+                  lr_s_range-low = 'SB'.
+                  APPEND lr_s_range TO lr_t_matelemcat.
+
+
+              ENDCASE.
+            ENDIF.
+
+*
+            IF <fs_fld> = 'X'.
+              CASE <fs_comp>-name.
+                WHEN 'PURCHASE_ORDERS'.
+                   lr_s_range-low = 'BE'.
+                   APPEND lr_s_range TO lr_t_matelemcat.
+
+
+                WHEN 'STOCK_QUALITY'.
+                    lr_s_range-low = 'S2'.
+                    APPEND lr_s_range TO lr_t_matelemcat.
+
+                WHEN 'PURCHASE_REQUISITIONS'.
+                    lr_s_range-low = 'BA'.
+                    APPEND lr_s_range TO lr_t_matelemcat.
+
+
+                WHEN 'PLANNED_ORDERS'.
+                    lr_s_range-low = 'PA'.
+                    APPEND lr_s_range TO lr_t_matelemcat.
+
+
+                WHEN 'PRODUCTION_ORDERS'.
+
+                    lr_s_range-low = 'FE'.
+                    APPEND lr_s_range TO lr_t_matelemcat.
+
+                WHEN 'SALES_ORDERS'.
+                    lr_s_range-low = 'VC'.
+                    APPEND lr_s_range TO lr_t_matelemcat.
+
+
+                WHEN 'STO_REQUIREMENTS'.
+                    lr_s_range-low = 'UR'.
+                    APPEND lr_s_range TO lr_t_matelemcat.
+
+                WHEN 'DEPENDENT_RESERVATIONS'.
+                    lr_s_range-low = 'AR'.
+                    APPEND lr_s_range TO lr_t_matelemcat.
+
+              ENDCASE.
+            ENDIF.
+
+
+
+
+          ENDLOOP.
+
+        ENDIF.
+      ENDIF.
+
+
+
+    ENDIF.
+
+
+
+
+    SELECT DISTINCT ProdAllocCharc01
+        FROM @it_cvc_data AS a
+        INTO TABLE @DATA(lt_material).
+    IF sy-subrc EQ 0.
+
+    ENDIF.
+
+
+
+*  Generate material filter for pulling the data
+    DATA(lr_t_material)   = VALUE if_rap_query_filter=>tt_range_option( FOR lwa_material IN lt_material
+                                                                        LET s = 'I'
+                                                                           o = 'EQ'
+                                                                        IN sign   = s
+                                                                           option = o
+                                                                    ( low = lwa_material-ProdAllocCharc01 ) ).
+
+
+
+
+
+
+**  Generate allowed Material Element Category
+*    DATA(lr_t_matelemcat)   = VALUE if_rap_query_filter=>tt_range_option(
+*                                                                        LET s = 'I'
+*                                                                           o = 'EQ'
+*                                                                        IN sign   = s
+*                                                                           option = o
+*                                                                    ( low = 'VC' )
+*                                                                    ( low = 'PA' )
+*                                                                    ( low = 'FE' )
+*                                                                    ( low = 'VJ' )
+*                                                                    ( low = 'BA' ) ).
+*
+*
+*    APPEND VALUE #( option = 'EQ'
+*                    sign   = 'I'
+*                    low    = 'VC' ) TO lr_t_matelemcat.
+
+
+
+    DATA(lt_filter) = VALUE if_rap_query_filter=>tt_name_range_pairs(
+                                                                      ( name = 'MATERIAL'
+                                                                        range = lr_t_material )
+                                                                      ).
+
+
+    DATA(lt_float_stk) = lo_stock->get_floating_stock( EXPORTING
+                                                         it_filter_cond = lt_filter ).
+
+
+    SELECT a~*
+        FROM @lt_float_stk AS a
+            WHERE mrpelementcategory IN @lr_t_matelemcat
+              AND mrpelementavailyorrqmtdate IN @it_date_range
+            INTO TABLE @DATA(lt_float_stk_fin).
+    IF sy-subrc EQ 0.
+
+      LOOP AT lt_float_stk_fin ASSIGNING FIELD-SYMBOL(<fs_float_stk>).
+
+        APPEND INITIAL LINE TO rt_float_stock ASSIGNING FIELD-SYMBOL(<fs_return>).
+        <fs_return> = CORRESPONDING #( <fs_float_stk> ).
+
+
+
+        CONVERT TIME STAMP <fs_float_stk>-MRPElementAvailyOrRqmtDate TIME ZONE sy-zonlo
+            INTO DATE DATA(lv_date) TIME DATA(lv_time)
+            DAYLIGHT SAVING TIME DATA(lv_dst).
+
+
+        LOOP AT it_buckets INTO DATA(ls_buckets).
+
+
+          IF lv_date GE ls_buckets-tstfr
+           AND lv_date LE ls_buckets-tstto.
+
+            <fs_return>-bucketidx = ls_buckets-column_idx.
+            EXIT.
+          ENDIF.
+
+        ENDLOOP.
+
+      ENDLOOP.
+*      LOOP AT lt_salesord_itm ASSIGNING FIELD-SYMBOL(<fs_itm>).
+*
+*        APPEND INITIAL LINE TO rt_salesord ASSIGNING FIELD-SYMBOL(<fs_salesord>).
+*        <fs_salesord>-ProductionPlant = <fs_itm>-ProductionPlant.
+*        <fs_salesord>-material      = <fs_itm>-Material.
+*        <fs_salesord>-customergrp   = <fs_itm>-CustomerGroup.
+*        <fs_salesord>-orderqty      = <fs_itm>-RequestedQuantity.
+*        <fs_salesord>-soldtoparty   = VALUE #( lt_saleord_hdr[ SalesOrder = <fs_itm>-salesorder ]-SoldToParty DEFAULT '' ).
+*
+*        CONVERT TIME STAMP VALUE #( lt_saleord_hdr[ SalesOrder = <fs_itm>-salesorder ]-SalesOrderDate DEFAULT '' ) TIME ZONE 'PST'
+*            INTO DATE DATA(lv_date) TIME DATA(lv_time)
+*            DAYLIGHT SAVING TIME DATA(lv_dst).
+*
+*        LOOP AT it_buckets INTO DATA(ls_buckets).
+*
+*          IF lv_date GE ls_buckets-tstfr
+*           AND lv_date LE ls_buckets-tstto.
+*
+*            <fs_salesord>-bucketidx = ls_buckets-column_idx.
+*            EXIT.
+*          ENDIF.
+*
+*        ENDLOOP.
+*
+*      ENDLOOP.
+*
+*      IF lines( rt_salesord ) GT 0.
+*        SORT rt_salesord BY material
+*                            customergrp
+*                            soldtoparty.
+*      ENDIF.
+
+
+
+    ENDIF.
+*
+
+  ENDMETHOD.
+
+
+  METHOD get_current_stock.
 *> Start of modification
-  TYPES: ltt_line_name    TYPE RANGE OF zust01_scrrow-line_name.
-  DATA: ls_filter_def     TYPE if_rap_query_filter=>ty_name_range_pairs.
-  DATA(lo_stock) = NEW zust01_cl_stock(  ).
+    TYPES: ltt_line_name    TYPE RANGE OF zust01_scrrow-line_name.
+    DATA: ls_filter_def     TYPE if_rap_query_filter=>ty_name_range_pairs.
+    DATA(lo_stock) = NEW zust01_cl_stock(  ).
 
 
 
-  SELECT DISTINCT ProdAllocCharc01
-      FROM @it_cvc_data AS a
-      INTO TABLE @DATA(lt_material).
+    SELECT DISTINCT ProdAllocCharc01
+        FROM @it_cvc_data AS a
+        INTO TABLE @DATA(lt_material).
     IF sy-subrc EQ 0.
 
     ENDIF.
@@ -1337,125 +1647,76 @@ METHOD get_current_stock.
   ENDMETHOD.
 
 
-  METHOD get_floating_stock.
-    TYPES: ltt_line_name    TYPE RANGE OF zust01_scrrow-line_name.
-    DATA: ls_filter_def     TYPE if_rap_query_filter=>ty_name_range_pairs.
-    DATA(lo_stock) = NEW zust01_cl_stock(  ).
+  METHOD m_fill_allocation_qty.
+
+      FIELD-SYMBOLS:
+        <fs_anyfld> TYPE any.
+
+      DATA(lv_keyfigure)    = VALUE #( is_keyfigures-range[ low = gs_scrrow-alc_qty ]-low DEFAULT '' ).
+      IF NOT lv_keyfigure IS INITIAL.
+
+        DATA(lv_keyfigure_dsc)  = VALUE #( it_scrrow[ line_name = lv_keyfigure ]-description DEFAULT '' ).
+        APPEND INITIAL LINE TO rt_prodalloc ASSIGNING FIELD-SYMBOL(<fs_prodalloc>).
+
+        <fs_prodalloc> = CORRESPONDING #( is_cvc_data ).
+        <fs_prodalloc>-KeyFigure = lv_keyfigure_dsc.
+        <fs_prodalloc>-KeyFigureID = 1.
+
+        <fs_prodalloc>-ProdAllocCVC01 = is_cvc_keyflds-ProdAllocCVC01.
+        <fs_prodalloc>-ProdAllocCVC02 = is_cvc_keyflds-ProdAllocCVC02.
+        <fs_prodalloc>-ProdAllocCVC03 = is_cvc_keyflds-ProdAllocCVC03.
+        <fs_prodalloc>-ProdAllocCVC04 = is_cvc_keyflds-ProdAllocCVC04.
+        <fs_prodalloc>-ProdAllocCVC05 = is_cvc_keyflds-ProdAllocCVC05.
+        <fs_prodalloc>-ProdAllocCVC06 = is_cvc_keyflds-ProdAllocCVC06.
+        <fs_prodalloc>-ProdAllocCVC07 = is_cvc_keyflds-ProdAllocCVC07.
 
 
 
-    SELECT DISTINCT ProdAllocCharc01
-        FROM @it_cvc_data AS a
-        INTO TABLE @DATA(lt_material).
-      IF sy-subrc EQ 0.
+*     Set the column bucket display
+        LOOP AT it_buckets INTO DATA(ls_buckets).
+          DATA(lv_tabix)    = sy-tabix.
+          DATA(lv_allocdat) = |ProdAllocDate{ lv_tabix }|.
+
+          ASSIGN COMPONENT lv_allocdat OF STRUCTURE <fs_prodalloc> TO <fs_anyfld>.
+          <fs_anyfld> = ls_buckets-display_name.
+
+        ENDLOOP.
+
+*     Get the time series data
+        DATA(lt_time_series) = get_prdalc_tmesers_data(
+                                       EXPORTING
+                                         prodalloccharcvalcombn = is_cvc_keyflds-CharcValueCombinationUUID
+                                         it_filter_cond         = it_filter_cond
+                                        ).
+
+        SORT lt_time_series BY ProdAllocPerdStartUTCDateTime ASCENDING.
+
+        LOOP AT lt_time_series INTO DATA(ls_timesrs) .
+
+          CONVERT TIME STAMP ls_timesrs-ProdAllocPerdStartUTCDateTime TIME ZONE ls_timesrs-ProdAllocPeriodStartTimeZone
+              INTO DATE DATA(lv_date) TIME DATA(lv_time)
+              DAYLIGHT SAVING TIME DATA(lv_dst).
+
+
+          lv_tabix = VALUE #( it_buckets[ tstfr = lv_date ]-column_idx DEFAULT 0 ).
+
+          IF lv_tabix IS INITIAL.
+            CONTINUE.
+          ENDIF.
+
+          DATA(lv_allocqty) = |ProductAllocationQty{ lv_tabix }|.
+
+          ASSIGN COMPONENT lv_allocqty OF STRUCTURE <fs_prodalloc> TO <fs_anyfld>.
+          IF sy-subrc = 0.
+            <fs_anyfld> = ls_timesrs-ProductAllocationQuantity.
+          ENDIF.
+
+
+        ENDLOOP.
+
 
       ENDIF.
 
-
-
-
-*  Generate material filter for pulling the data
-      DATA(lr_t_material)   = VALUE if_rap_query_filter=>tt_range_option( FOR lwa_material IN lt_material
-                                                                          LET s = 'I'
-                                                                             o = 'EQ'
-                                                                          IN sign   = s
-                                                                             option = o
-                                                                      ( low = lwa_material-ProdAllocCharc01 ) ).
-
-
-**  Generate allowed Material Element Category
-      DATA(lr_t_matelemcat)   = VALUE if_rap_query_filter=>tt_range_option(
-                                                                          LET s = 'I'
-                                                                             o = 'EQ'
-                                                                          IN sign   = s
-                                                                             option = o
-                                                                      ( low = 'VC' )
-                                                                      ( low = 'PA' )
-                                                                      ( low = 'FE' )
-                                                                      ( low = 'VJ' )
-                                                                      ( low = 'BA' )
-                                                                      ( low = 'BA' ) ).
-
-      DATA(lt_filter) = VALUE if_rap_query_filter=>tt_name_range_pairs(
-                                                                        ( name = 'MATERIAL'
-                                                                          range = lr_t_material )
-                                                                        ).
-
-
-      DATA(lt_float_stk) = lo_stock->get_floating_stock( EXPORTING
-                                                           it_filter_cond = lt_filter ).
-
-
-      SELECT a~*
-          FROM @lt_float_stk AS a
-              WHERE mrpelementcategory IN @lr_t_matelemcat
-                AND mrpelementavailyorrqmtdate IN @it_date_range
-              INTO TABLE @DATA(lt_float_stk_fin).
-        IF sy-subrc EQ 0.
-
-          LOOP AT lt_float_stk_fin ASSIGNING FIELD-SYMBOL(<fs_float_stk>).
-
-            APPEND INITIAL LINE TO rt_float_stock ASSIGNING FIELD-SYMBOL(<fs_return>).
-            <fs_return> = CORRESPONDING #( <fs_float_stk> ).
-
-
-
-            CONVERT TIME STAMP <fs_float_stk>-MRPElementAvailyOrRqmtDate TIME ZONE sy-zonlo
-                INTO DATE DATA(lv_date) TIME DATA(lv_time)
-                DAYLIGHT SAVING TIME DATA(lv_dst).
-
-
-            LOOP AT it_buckets INTO DATA(ls_buckets).
-
-
-              IF lv_date GE ls_buckets-tstfr
-               AND lv_date LE ls_buckets-tstto.
-
-                <fs_return>-bucketidx = ls_buckets-column_idx.
-                EXIT.
-              ENDIF.
-
-            ENDLOOP.
-
-          ENDLOOP.
-*      LOOP AT lt_salesord_itm ASSIGNING FIELD-SYMBOL(<fs_itm>).
-*
-*        APPEND INITIAL LINE TO rt_salesord ASSIGNING FIELD-SYMBOL(<fs_salesord>).
-*        <fs_salesord>-ProductionPlant = <fs_itm>-ProductionPlant.
-*        <fs_salesord>-material      = <fs_itm>-Material.
-*        <fs_salesord>-customergrp   = <fs_itm>-CustomerGroup.
-*        <fs_salesord>-orderqty      = <fs_itm>-RequestedQuantity.
-*        <fs_salesord>-soldtoparty   = VALUE #( lt_saleord_hdr[ SalesOrder = <fs_itm>-salesorder ]-SoldToParty DEFAULT '' ).
-*
-*        CONVERT TIME STAMP VALUE #( lt_saleord_hdr[ SalesOrder = <fs_itm>-salesorder ]-SalesOrderDate DEFAULT '' ) TIME ZONE 'PST'
-*            INTO DATE DATA(lv_date) TIME DATA(lv_time)
-*            DAYLIGHT SAVING TIME DATA(lv_dst).
-*
-*        LOOP AT it_buckets INTO DATA(ls_buckets).
-*
-*          IF lv_date GE ls_buckets-tstfr
-*           AND lv_date LE ls_buckets-tstto.
-*
-*            <fs_salesord>-bucketidx = ls_buckets-column_idx.
-*            EXIT.
-*          ENDIF.
-*
-*        ENDLOOP.
-*
-*      ENDLOOP.
-*
-*      IF lines( rt_salesord ) GT 0.
-*        SORT rt_salesord BY material
-*                            customergrp
-*                            soldtoparty.
-*      ENDIF.
-
-
-
-        ENDIF.
-*
-
-      ENDMETHOD.
-
+  ENDMETHOD.
 
 ENDCLASS.

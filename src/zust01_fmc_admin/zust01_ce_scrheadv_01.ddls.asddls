@@ -20,7 +20,6 @@ define custom entity ZUST01_CE_SCRHEADV_01
       draft_display                 : zust01_fmc_amc_draft_display;
       draft_multi_user              : zust01_fmc_amc_draft_multi_usr;
       allow_notes                   : zust01_fmc_amc_allow_notes;
-      consumption_view              : zust01_fmc_amc_consumption_vw;
       cvc_add_remove                : zust01_fmc_amc_add_remove_cvcs;
       sales_order_view              : zust01_fmc_amc_toolbar_ord_vw;
       user_settings                 : zust01_fmc_amc_user_settings;

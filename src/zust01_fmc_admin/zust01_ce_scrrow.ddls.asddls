@@ -1,6 +1,6 @@
 @AccessControl.authorizationCheck: #NOT_REQUIRED
 @EndUserText.label: 'Custom Entity for SCRROW'
-define root view entity ZUST01_CE_SCRROW as select from zust01_scrrow
+define root view entity ZUST01_CE_SCRROW as select from zust01_scrrow_01
 {
     key planning_screen as PlanningScreen,
     key line_name as LineName,
@@ -32,6 +32,6 @@ define root view entity ZUST01_CE_SCRROW as select from zust01_scrrow
     created_by as CreatedBy,
     created_at as CreatedAt,
     local_last_changed_by as LocalLastChangedBy,
-    local_last_chagned_at as LocalLastChagnedAt,
+    local_last_changed_at as LocalLastChagnedAt,
     last_changed_at as LastChangedAt
 }

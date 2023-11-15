@@ -10,7 +10,6 @@
     <OUTPUTLEN>000003</OUTPUTLEN>
     <DDTEXT>AMC: Calculation sequence</DDTEXT>
     <DOMMASTER>E</DOMMASTER>
-    <ABAP_LANGUAGE_VERSION>5</ABAP_LANGUAGE_VERSION>
    </DD01V>
   </asx:values>
  </asx:abap>

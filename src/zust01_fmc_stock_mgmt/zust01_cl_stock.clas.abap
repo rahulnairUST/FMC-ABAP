@@ -60,7 +60,7 @@ ENDCLASS.
 
 
 
-CLASS zust01_cl_stock IMPLEMENTATION.
+CLASS ZUST01_CL_STOCK IMPLEMENTATION.
 
 
   METHOD if_oo_adt_classrun~main.
@@ -111,6 +111,7 @@ CLASS zust01_cl_stock IMPLEMENTATION.
 
   ENDMETHOD.
 
+
   METHOD get_stock.
 
     TRY.
@@ -120,6 +121,7 @@ CLASS zust01_cl_stock IMPLEMENTATION.
     ENDTRY.
 
   ENDMETHOD.
+
 
   METHOD get_current_stock.
 
@@ -198,6 +200,7 @@ CLASS zust01_cl_stock IMPLEMENTATION.
     ENDTRY.
   ENDMETHOD.
 
+
   METHOD get_floating_stock.
 
     DATA: lt_business_data TYPE TABLE OF zust01_materialmultistockbydat,
@@ -274,6 +277,4 @@ CLASS zust01_cl_stock IMPLEMENTATION.
 
     ENDTRY.
   ENDMETHOD.
-
-
 ENDCLASS.

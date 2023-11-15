@@ -25,7 +25,7 @@ ENDCLASS.
 
 
 
-CLASS zust01_cl_salesord_f4 IMPLEMENTATION.
+CLASS ZUST01_CL_SALESORD_F4 IMPLEMENTATION.
 
 
   METHOD if_oo_adt_classrun~main.
@@ -59,6 +59,7 @@ CLASS zust01_cl_salesord_f4 IMPLEMENTATION.
     ENDTRY.
 
   ENDMETHOD.
+
 
   METHOD get_sales_order_f4.
 

@@ -1,6 +1,10 @@
 @EndUserText.label: 'Service definition forZUST01_C_SCRHEADTP_000'
 define service ZUST01_UI_SCRHEADTP_000 {
   expose ZUST01_C_SCRHEADTP_000 as FLEXIOM;
-  expose ZUST01_CE_SCRROW as FLEXIOMROW;
-  expose ZUST01_CE_SCRROW_01 as KEYFIGURES;
+  expose ZUST01_CE_SCRROW       as FLEXIOMROW;
+  expose ZUST01_CE_SCRROW_01    as KEYFIGURES;
+  expose ZUST01_CE_SCRROW_V02   as Rows;
+  expose zust01_scrheadv_v02    as PlanningScreenStngs;
+  expose ZUST01_CE_SCRCOL_V02   as Columns;
+  expose ZUST01_CE_SELID_V02    as SelectionIDS;
 }

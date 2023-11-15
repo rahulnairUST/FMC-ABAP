@@ -16,13 +16,13 @@ ENDCLASS.
 
 
 
-CLASS zust01_fmc_scrrow_01 IMPLEMENTATION.
+CLASS ZUST01_FMC_SCRROW_01 IMPLEMENTATION.
 
 
   METHOD if_oo_adt_classrun~main.
 
     DATA: lt_scrcol TYPE TABLE OF zust01_scrcol,
-          lt_scrrow TYPE TABLE OF zust01_scrrow.
+          lt_scrrow TYPE TABLE OF zust01_scrrow_01.
 *    DELETE FROM zust01_scrcol.
 *
 *
@@ -123,10 +123,10 @@ CLASS zust01_fmc_scrrow_01 IMPLEMENTATION.
                           ).
 *
 ** Delete older data
-    DELETE FROM zust01_scrrow.
+    DELETE FROM zust01_scrrow_01.
 *
 * Insert initial data
-    INSERT zust01_scrrow FROM TABLE @lt_scrrow.
+    INSERT zust01_scrrow_01 FROM TABLE @lt_scrrow.
 
   ENDMETHOD.
 
