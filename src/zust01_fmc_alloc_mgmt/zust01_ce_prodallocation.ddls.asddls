@@ -1,6 +1,6 @@
 @EndUserText.label: 'Custom Entity for Product Allocation CVC Demo'
 @ObjectModel.query.implementedBy: 'ABAP:ZUST01_CL_PRODALLOCATION'
-define custom entity ZUST01_CE_PRODALLOCATION
+define root custom entity ZUST01_CE_PRODALLOCATION
 {
 key CharcValueCombinationUUID : sysuuid_x16 ;  
  ProductAllocationObjectUUID : sysuuid_x16 ;
@@ -55,4 +55,30 @@ key CharcValueCombinationUUID : sysuuid_x16 ;
  ProdAllocCVC06 : zust01_fmc_amc_column_descr ;
  ProdAllocCVC07 : zust01_fmc_amc_column_descr ;
  ProdAllocPerdStartUTCDateTime : abap.char(8);
+ ProdAllocPerdEndUTCDateTime : abap.char(8);
+ TimeSeriesUUID1 : sysuuid_x16 ;
+ TimeSeriesUUID2 : sysuuid_x16 ;
+ TimeSeriesUUID3 : sysuuid_x16 ;
+ TimeSeriesUUID4 : sysuuid_x16 ;
+ TimeSeriesUUID5 : sysuuid_x16 ;
+ TimeSeriesUUID6 : sysuuid_x16 ;
+ TimeSeriesUUID7 : sysuuid_x16 ;
+ TimeSeriesUUID8 : sysuuid_x16 ;
+ TimeSeriesUUID9 : sysuuid_x16 ;
+ TimeSeriesUUID10 : sysuuid_x16 ;
+ TimeSeriesUUID11 : sysuuid_x16 ;
+ TimeSeriesUUID12 : sysuuid_x16 ;
+ ProdAllocOldQty1 : abap.dec( 15, 0 ) ;  
+ ProdAllocOldQty2 : abap.dec( 15, 0 ) ;
+ ProdAllocOldQty3 : abap.dec( 15, 0 ) ;
+ ProdAllocOldQty4 : abap.dec( 15, 0 ) ;
+ ProdAllocOldQty5 : abap.dec( 15, 0 ) ;
+ ProdAllocOldQty6 : abap.dec( 15, 0 ) ;
+ ProdAllocOldQty7 : abap.dec( 15, 0 ) ;
+ ProdAllocOldQty8 : abap.dec( 15, 0 ) ;
+ ProdAllocOldQty9 : abap.dec( 15, 0 ) ;
+ ProdAllocOldQty10 : abap.dec( 15, 0 ) ;
+ ProdAllocOldQty11 : abap.dec( 15, 0 ) ;
+ ProdAllocOldQty12 : abap.dec( 15, 0 ) ;
+ 
 }

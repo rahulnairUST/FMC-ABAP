@@ -88,6 +88,10 @@ CLASS ZCL_ROW_SETNGS_FETCH IMPLEMENTATION.
         ENDIF.
 
 
+        LOOP AT lt_final_data ASSIGNING FIELD-SYMBOL(<fs_final>).
+            <fs_final>-description = to_mixed( <fs_final>-description ).
+        ENDLOOP.
+
         io_response->set_total_number_of_records( lines( lt_final_data ) ).
         io_response->set_data( lt_final_data ).
 

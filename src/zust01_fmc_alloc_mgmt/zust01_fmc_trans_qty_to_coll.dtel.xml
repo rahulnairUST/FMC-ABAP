@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<abapGit version="v1.0.0" serializer="LCL_OBJECT_DTEL" serializer_version="v1.0.0">
+ <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+  <asx:values>
+   <DD04V>
+    <ROLLNAME>ZUST01_FMC_TRANS_QTY_TO_COLL</ROLLNAME>
+    <DDLANGUAGE>E</DDLANGUAGE>
+    <DOMNAME>ZUST01_FMC_TRANS_QTY_TO_COLL</DOMNAME>
+    <HEADLEN>55</HEADLEN>
+    <SCRLEN1>10</SCRLEN1>
+    <SCRLEN2>20</SCRLEN2>
+    <SCRLEN3>40</SCRLEN3>
+    <DDTEXT>AMC: Transfer quantity to collective CVC</DDTEXT>
+    <REPTEXT>Transfer QTY To Collective CVC</REPTEXT>
+    <SCRTEXT_S>TransToCol</SCRTEXT_S>
+    <SCRTEXT_M>Trans To Coll. CVC</SCRTEXT_M>
+    <SCRTEXT_L>Transfer QTY To Collective CVC</SCRTEXT_L>
+    <DTELMASTER>E</DTELMASTER>
+    <REFKIND>D</REFKIND>
+    <ABAP_LANGUAGE_VERSION>5</ABAP_LANGUAGE_VERSION>
+   </DD04V>
+  </asx:values>
+ </asx:abap>
+</abapGit>

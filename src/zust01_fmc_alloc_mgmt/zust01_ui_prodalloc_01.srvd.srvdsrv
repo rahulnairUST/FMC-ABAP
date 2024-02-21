@@ -1,17 +1,20 @@
 @EndUserText.label: 'ZUST01_UI_PRODALLOC_01'
 define service ZUST01_UI_PRODALLOC_01 {
-  expose ZUST01_CE_PLNGSCR_F4     as PlnScrF4Help;
-  expose ZUST01_CE_KEYFIG_F4      as KeyFigF4Help;
-  expose ZUST01_CE_PRODALLOCATION as ProdAlloc;
-  expose ZUST01_CE_SALESORDER_01  as SalesOrder;
-  expose ZUST01_CE_SALESORD_F4    as SalesOrderF4Help;
-  expose ZUST01_CE_SALESORDITM_F4 as SalesOrderItmF4Help;
-  expose ZUST01_CE_SELID_01       as SelectionID;
-  expose ZUST01_CE_SELID_D_01     as SelectionID_DataSrc;
-  expose ZUST01_CE_MATERIAL_F4    as MaterialF4Help;
-  expose ZUST01_CE_PLANT_F4       as PlantF4Help;
-  expose ZUST01_CE_SOLDTO_F4      as SoldToF4Help;
-  expose ZUST01_CE_SHIPTO_F4      as ShipToF4Help;
-  expose ZUST01_CE_ALLOCSEQ_F4    as AllocSeqF4Help;
-  expose ZUST01_CE_ALLOCOBJ_F4    as AllocObjF4Help;
+  expose ZUST01_CE_PLNGSCR_F4       as PlnScrF4Help;
+  expose ZUST01_CE_KEYFIG_F4        as KeyFigF4Help;
+  expose ZUST01_CE_PRODALLOCATION   as ProdAlloc;
+  expose ZUST01_CE_SALESORDER_01    as SalesOrder;
+  expose ZUST01_CE_SALESORD_F4      as SalesOrderF4Help;
+  expose ZUST01_CE_SALESORDITM_F4   as SalesOrderItmF4Help;
+  expose ZUST01_CE_SELID_01         as SelectionID;
+  expose ZUST01_CE_SELID_D_01       as SelectionID_DataSrc;
+  expose ZUST01_CE_MATERIAL_F4      as MaterialF4Help;
+  expose ZUST01_CE_PLANT_F4         as PlantF4Help;
+  expose ZUST01_CE_SOLDTO_F4        as SoldToF4Help;
+  expose ZUST01_CE_SHIPTO_F4        as ShipToF4Help;
+  expose ZUST01_CE_ALLOCSEQ_F4      as AllocSeqF4Help;
+  expose ZUST01_CE_ALLOCOBJ_F4      as AllocObjF4Help;
+  expose ZUST01_CE_TRC_cvc          as TraceCVC;
+  expose ZUST01_CE_TRC_ts           as TraceTS;
+  expose ZUST01_CE_PRODALLOCACTSTAT as ProdAllocActStat;
 }

@@ -78,7 +78,8 @@ CLASS ZUST01_FMC_SCRROW_01 IMPLEMENTATION.
 
 
 
-    lt_scrrow = VALUE #( (  mandt = '100'
+    lt_scrrow = VALUE #(
+                            (  mandt = '100'
                             planning_screen = 'ZUST_FMC_ALLOC_DEMO'
                             line_name = 'ALLOCATION_QTY'
                             description = 'Allocation Qty'
@@ -120,8 +121,57 @@ CLASS ZUST01_FMC_SCRROW_01 IMPLEMENTATION.
                               allow_keyfg_selection = 'X'
                               sorting = 5 )
 
+                        (  mandt = '100'
+                            planning_screen = 'AW_SALES_ALLOCATION'
+                            line_name = 'ALLOCATION_QTY'
+                            description = 'Allocation Qty'
+                            allow_keyfg_selection = 'X'
+                            sorting = 1 )
+
+                         (  mandt = '100'
+                            planning_screen = 'AW_SALES_ALLOCATION'
+                            line_name = 'ALLOCATION_QTY_ORG'
+                            description = 'Allocation Qty Org'
+                            allow_keyfg_selection = ' '
+                            sorting = 900 )
+
+                            ( mandt = '100'
+                              planning_screen = 'AW_SALES_ALLOCATION'
+                              line_name = 'ORDER_INCOMING_QTY'
+                              description = 'Order Incoming Qty'
+                              allow_keyfg_selection = 'X'
+                              sorting = 2 )
+
+                            ( mandt = '100'
+                              planning_screen = 'AW_SALES_ALLOCATION'
+                              line_name = 'REMAINING_QTY'
+                              description = 'Remaining Qty'
+                              allow_keyfg_selection = 'X'
+                              sorting = 3 )
+
+                          ( mandt = '100'
+                            planning_screen = 'AW_SALES_ALLOCATION'
+                            line_name = 'REMAINING_QTY_PERCENT'
+                            description = 'Remaining Qty [%]'
+                            allow_keyfg_selection = 'X'
+                            sorting = 4 )
+
+                            ( mandt = '100'
+                              planning_screen = 'AW_SALES_ALLOCATION'
+                              line_name = 'DA_STOCK_AND_RECEIPTS'
+                              description = 'Stock and receipts'
+                              allow_keyfg_selection = 'X'
+                              sorting = 5 )
+
+                            ( mandt = '100'
+                              planning_screen = 'AW_SALES_ALLOCATION'
+                              line_name = 'DA_STOCK_AND_RECEIPTS_CUM'
+                              description = 'Stock and receipts, cumulated'
+                              allow_keyfg_selection = 'X'
+                              sorting = 5 )
+
                           ).
-*
+
 ** Delete older data
     DELETE FROM zust01_scrrow_01.
 *

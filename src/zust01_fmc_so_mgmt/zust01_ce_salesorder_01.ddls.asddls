@@ -168,6 +168,11 @@ define custom entity ZUST01_CE_SALESORDER_01
       BOPConfStatus : abap.char( 60 );
       BOPCOnfStatusText : abap.char( 60 );
       BOPConfStatusIcon : abap.char( 4 );
+      ShipToParty : abap.char( 10 ) ;
+      SoldToPartyName : abap.char( 35 ) ; 
+      ShipToPartyName : abap.char( 35 ) ;  
+      CustomerName : abap.char( 35 ) ;
+      CustomerCity : abap.char( 35 ) ;
       
       
 }

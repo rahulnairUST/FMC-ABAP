@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<abapGit version="v1.0.0" serializer="LCL_OBJECT_DTEL" serializer_version="v1.0.0">
+ <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+  <asx:values>
+   <DD04V>
+    <ROLLNAME>ZUST01_PRODALLOCQTYUNIT</ROLLNAME>
+    <DDLANGUAGE>E</DDLANGUAGE>
+    <SCRLEN3>40</SCRLEN3>
+    <DDTEXT>Product Allocation Quantity Unit</DDTEXT>
+    <SCRTEXT_L>Quantity Unit</SCRTEXT_L>
+    <DTELMASTER>E</DTELMASTER>
+    <DATATYPE>UNIT</DATATYPE>
+    <LENG>000003</LENG>
+    <OUTPUTLEN>000003</OUTPUTLEN>
+    <ABAP_LANGUAGE_VERSION>5</ABAP_LANGUAGE_VERSION>
+   </DD04V>
+  </asx:values>
+ </asx:abap>
+</abapGit>

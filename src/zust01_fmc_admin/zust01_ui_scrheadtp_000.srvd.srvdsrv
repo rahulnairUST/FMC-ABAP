@@ -7,4 +7,5 @@ define service ZUST01_UI_SCRHEADTP_000 {
   expose zust01_scrheadv_v02    as PlanningScreenStngs;
   expose ZUST01_CE_SCRCOL_V02   as Columns;
   expose ZUST01_CE_SELID_V02    as SelectionIDS;
+  expose ZUST01_CE_ALLOC_OBJ    as AllocationObject;
 }

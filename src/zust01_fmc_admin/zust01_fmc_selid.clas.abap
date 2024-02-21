@@ -57,7 +57,19 @@ CLASS ZUST01_FMC_SELID IMPLEMENTATION.
                             (  mandt = '100'
                            selection_id = 'ZFMC_STOCK_AND_RECEIPTS_CUM'
                            source = 'D' ) "TIMESERIES data - stock, receipts, issues
-                          ).
+
+                          ( mandt = '100'
+                           selection_id = 'DA_ALLOC_QTY'
+                           source = 'A' ) "aATP Product Allocation
+
+                            (  mandt = '100'
+                           selection_id = 'DA_STOCK_AND_RECEIPTS'
+                           source = 'D' ) "TIMESERIES data - stock, receipts, issues
+
+                          (  mandt = '100'
+                           selection_id = 'DA_CONSUMPTION_QTY'
+                           source = 'A' ) "aATP Product Allocation
+                           ).
 *
 ** Delete older data
     DELETE FROM zust01_selid.
@@ -88,6 +100,27 @@ CLASS ZUST01_FMC_SELID IMPLEMENTATION.
 
                             (  mandt = '100'
                              selection_id = 'ZFMC_STOCK_AND_RECEIPTS'
+                              stock_unrestricted = 'X'
+                              stock_safety = 'X'
+                              stock_in_transfer = 'X'
+                              stock_quality = 'X'
+                              stock_blocked = 'X'
+                              stock_restricted = 'X'
+                              purchase_requisitions = 'X'
+                              purchase_orders = ' '
+                              shipping_notifications = 'X'
+                              planned_orders = ' '
+                              production_orders = ' '
+                              no_receipts_in_past = 'X'
+                              sales_orders = ' '
+                              deliveries = 'X'
+                              sto_requirements = ' '
+                              reservations = 'X'
+                              dependent_requirements = 'X'
+                              dependent_reservations = ' ' )
+
+                              (  mandt = '100'
+                             selection_id = 'DA_STOCK_AND_RECEIPTS'
                               stock_unrestricted = 'X'
                               stock_safety = 'X'
                               stock_in_transfer = 'X'
